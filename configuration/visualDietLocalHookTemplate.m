@@ -38,13 +38,11 @@ end
 userID = strtrim(userID);
 
 visualDiet_dataBasePath = ['/Users/' userID '/OneDrive - Children''s Hospital of Philadelphia/Research/Visual Diet/Data/'];
-visualDiet_dataBasePath = ['/Users/' userID '/OneDrive - Children''s Hospital of Philadelphia/Research/Pfizer Registry/Data/visualDiet/'];
 visualDiet_analysisBasePath = ['/Users/' userID '/OneDrive - Children''s Hospital of Philadelphia/Research/Visual Diet/Analysis/'];
 
 %% Specify where output goes (for mac)
 
 % Code to run on Mac plaform
-setpref(projectName,'visualDietDataPath', visualDiet_dataBasePath);
 setpref(projectName,'visualDietDataPath', visualDiet_dataBasePath);
 setpref(projectName,'visualDietAnalysisPath', visualDiet_analysisBasePath);
 
