@@ -2,7 +2,7 @@
 
 data_path = getpref('visualDiet','visualDietDataPath');
 
-T = readtable([data_path '/CPG_20240520.txt']);
+T = readtable([data_path 'CPG_20240520.txt']);
 
 figure
 subplot(2,1,1)
