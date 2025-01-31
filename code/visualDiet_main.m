@@ -5,13 +5,15 @@
 data_path = getpref('visualDiet','visualDietDataPath');
 
 load([data_path 'VDS.mat'])
+load([data_path 'surveyData.mat'])
 
 participants = fieldnames(headache_diary);
 
 actlumus = struct2cell(actlumus);
 headache_diary = struct2cell(headache_diary);
 
-bad_trials = [zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7);[0 0 0 0 0 0 1]];
+bad_trials = [zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7);[0 0 0 0 0 0 1];...
+    zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7)];
 
 figure
 for i = 1:length(participants)
@@ -40,12 +42,6 @@ for i = 1:length(participants)
     Day = unique(hd.day);
     
     vd_cleaned = vd(ismember(vd.day,hd.day),:);
-    
-    % Convert light and mEDI data to log scale
-%     vd_cleaned.LIGHT(vd_cleaned.LIGHT==0) = 0.009;
-%     vd_cleaned.LIGHT = log(vd_cleaned.LIGHT);
-%     vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI==0) = 0.009;
-%     vd_cleaned.MELANOPICEDI = log(vd_cleaned.MELANOPICEDI);
 
     % Combine headache diary with actlumus mean metrics, calculating mean luminance
     % data over each hour by day
@@ -78,37 +74,28 @@ for i = 1:length(participants)
     Hours = 0:1:23;
     Light_hr = NaN*ones(length(Day),length(Hours));
     mEDI_hr = NaN*ones(length(Day),length(Hours));
-    mEDI = NaN*ones(length(Day),1);
-    Light = NaN*ones(length(Day),1);
     Min250_B10 = NaN*ones(length(Day),1);
-    Min1000_B10 = NaN*ones(length(Day),1);
+    Min1000_B10l = NaN*ones(length(Day),1);
     Max10_E3 = NaN*ones(length(Day),1);
     Max1_D6 = NaN*ones(length(Day),1);
-    D6 = NaN*ones(length(Day),1);
-    B10 = NaN*ones(length(Day),1);
-    B10l = NaN*ones(length(Day),1);
-    E3 = NaN*ones(length(Day),1);
+    Light = NaN*ones(length(Day),1);
+    mEDI = NaN*ones(length(Day),1);
 
     for d = 1:length(Day)
         % remove data from days where the device was removed, or there
         % is incomplete data for the day
         if bad_trials(i,d)==0
             for h = 1:24
-                Light_hr(d,h) = nanmedian(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & vd_cleaned.hour==Hours(h)));
+                Light_hr(d,h) = nanmedian(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & vd_cleaned.hour==Hours(h))); % photopic light
                 mEDI_hr(d,h) = nanmedian(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & vd_cleaned.hour==Hours(h)));
             end
-            mEDI(d,1) = nanmedian(mEDI_hr(d,:));
-            Light(d,1) = nanmedian(Light_hr(d,:));
-            D6(d,1) = nanmedian(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & vd_cleaned.hour<6));
-            B10(d,1) = nanmedian(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & vd_cleaned.hour>7 & vd_cleaned.hour<17));
-            E3(d,1) = nanmedian(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & vd_cleaned.hour>=20 & vd_cleaned.hour<23));
-            B10l(d,1) = nanmedian(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17 & ~isnan(vd_cleaned.LIGHT)));
-            
-            % percentage over a time period of certain light exposures
-            Min250_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>250 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./600;
-            Min1000_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>1000 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./600;
-            Max10_E3(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI<10 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=20 & vd_cleaned.hour<23))./180;
-            Max1_D6(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI<1 & vd_cleaned.day==Day(d) & vd_cleaned.hour<6))./360;
+            Light(d,1) = sum(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.LIGHT)))./60; % calculate lux*hr
+            mEDI(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.LIGHT)))./60; % calculate lux*hr
+            % time period of certain light exposures
+            Min250_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>250 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./(10*60);
+            Min1000_B10l(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.LIGHT>1000 & vd_cleaned.day==Day(d)));
+            Max10_E3(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI<10 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=20 & vd_cleaned.hour<23))./(3*60);
+            Max1_D6(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI<1 & vd_cleaned.day==Day(d) & vd_cleaned.hour<6))./(6*60);
            
             clear temp*
         end
@@ -118,13 +105,9 @@ for i = 1:length(participants)
     mEDI_by_day = reshape(vd_cleaned.MELANOPICEDI,[1440,7]);
     
     t.Light = Light;
-    t.Light_B10 = B10l;
     t.mEDI = mEDI;
-    t.mEDI_D6 = D6;
-    t.mEDI_B10 = B10;
-    t.mEDI_E3 = E3;
     t.mEDI_min250 = Min250_B10;
-    t.mEDI_min1000 = Min1000_B10;
+    t.light_min1000 = Min1000_B10l;
     t.mEDI_max10 = Max10_E3;
     t.mEDI_max1 = Max1_D6;
     
@@ -144,16 +127,22 @@ for i = 1:length(participants)
         y = light_by_day(:,X);
         y(y==0) = 0.001;
         y = log(y);
+        y2 = mEDI_by_day(:,X);
+        y2(y2==0) = 0.001;
+        y2 = log(y2);
         if bad_trials(i,X)==0
-            c1 = [0 0 0];
+            c1 = [0.5 0.5 0];
+            c2 = [0.8 0.8 1];
         else
             c1 = [0.5 0.5 0.5];
+            c2 = [0.2 0.2 0.2];
         end
         fill([7+(24*(X-1)) 7+(24*(X-1)) 17+(24*(X-1)) 17+(24*(X-1))],log([0.001 100000 100000 0.001]),[1 1 0.8])
         hold on
         fill([20+(24*(X-1)) 20+(24*(X-1)) 23+(24*(X-1)) 23+(24*(X-1))],log([0.001 100000 100000 0.001]),[0.8 0.8 1])
         fill([0+(24*(X-1)) 0+(24*(X-1)) 6+(24*(X-1)) 6+(24*(X-1))],log([0.001 100000 100000 0.001]),[0.8 0.8 0.8])
         plot(x,y,'Color',c1)
+        plot(x,y2,'Color',c2)
         plot([x(end) x(end)],[0.1 log(120000)],'--','Color',[0.5 0.5 0.5])
         ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 24*7];
         ax.YLim = [log(0.009) log(120000)]; ax.YTick = log([0.1 1 10 100 1000 10000 100000]); ax.YTickLabels = {'0','1','10','100','1,000','10,000','100,000'}; ax.XTick = 24:24:24*7; 
@@ -168,7 +157,9 @@ for i = 1:length(participants)
         x = x+24;
     end
     
-    clear Light T250 Hr250 D5 B10 Min250* Min1000* Max10* Max1* 
+    clear B10* Min250* Min1000* Max10* Max1* 
+    
+    
     
     if i==1
         T = subject_data.summary{1,1};
@@ -180,45 +171,16 @@ end
 
 participants = unique(T.record_id);
 
-figure(100)
-counter = 1;
-for i = 1:length(participants)
-    
-    figure(100)
-    subplot(length(participants),2,counter)
-    plot(T.light_scale(T.record_id==participants(i)),T.Light(T.record_id==participants(i)),'.k','MarkerSize',12)
-    hold on
-    lsline
-    ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [-0.1 5.1];
-    [A,B] = corr(T.light_scale(T.record_id==participants(i) & ~isnan(T.Light)),T.Light(T.record_id==participants(i) & ~isnan(T.Light)),'Type','Spearman');
-    title(['R = ' num2str(A) ', p = ' num2str(B)])
-    xlabel('Light Sensitivity Scale (0 - 5)')
-    ylabel('Luminance (lux)')
-    counter = counter+1;
-    
-    figure(100)
-    subplot(length(participants),2,counter)
-    plot(T.pain_score(T.record_id==participants(i)),T.Light(T.record_id==participants(i)),'.k','MarkerSize',12)
-    hold on
-    lsline
-    ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [-0.1 10.1];
-    [A,B] = corr(T.pain_score(T.record_id==participants(i) & ~isnan(T.Light)),T.Light(T.record_id==participants(i) & ~isnan(T.Light)),'Type','Spearman');
-    title(['R = ' num2str(A) ', p = ' num2str(B)])
-    xlabel('HA Pain Scale (0 - 10)')
-    ylabel('Luminance (lux)')
-    counter = counter+1;
-end
-clear A B a b c
 
 % pre-allocate
 HaPrct = NaN*ones(length(participants),1); DisabilityPrct = NaN*ones(length(participants),1);
 MigPrct = NaN*ones(length(participants),1); 
 pain_scoreM = NaN*ones(length(participants),1); light_scaleM = NaN*ones(length(participants),1);
-B10m = NaN*ones(length(participants),1); D6m = NaN*ones(length(participants),1);
-E3m = NaN*ones(length(participants),1); B10ml = NaN*ones(length(participants),1);
+Light = NaN*ones(length(participants),1);
+mEDI = NaN*ones(length(participants),1);
 B10_250m = NaN*ones(length(participants),1); B10_1000m = NaN*ones(length(participants),1);
 E3_10m = NaN*ones(length(participants),1); D6_1m = NaN*ones(length(participants),1);
-HAhrM = NaN*ones(length(participants),1); D6_1m = NaN*ones(length(participants),1);
+HAhrM = NaN*ones(length(participants),1);
 
 for i = 1:length(participants)
     HaPrct(i,1) = length(T.record_id(T.record_id==participants(i) & T.ha==1))./length(T.record_id(T.record_id==participants(i)));
@@ -228,50 +190,59 @@ for i = 1:length(participants)
     pain_scoreM(i,:) = prctile(boot2,50);
     boot3 = bootstrp(1000,@median,T.light_scale(T.record_id==participants(i)));
     light_scaleM(i,:) = prctile(boot3,50);
-    B10m(i,:) = nanmedian(T.mEDI_B10(T.record_id==participants(i)));
-    E3m(i,:) = nanmedian(T.mEDI_E3(T.record_id==participants(i)));
-    D6m(i,:) = nanmedian(T.mEDI_D6(T.record_id==participants(i)));
+    Light(i,:) = nanmedian(T.Light(T.record_id==participants(i)));
+    mEDI(i,:) = nanmedian(T.mEDI(T.record_id==participants(i)));
     B10_250m(i,:) = nanmedian(T.mEDI_min250(T.record_id==participants(i)));
-    B10_1000m(i,:) = nanmedian(T.mEDI_min1000(T.record_id==participants(i)));
+    B10_1000m(i,:) = nanmedian(T.light_min1000(T.record_id==participants(i)));
     E3_10m(i,:) = nanmedian(T.mEDI_max10(T.record_id==participants(i)));
     D6_1m(i,:) = nanmedian(T.mEDI_max1(T.record_id==participants(i)));
-    E3m(i,:) = nanmedian(T.mEDI_E3(T.record_id==participants(i)));
-    D6m(i,:) = nanmedian(T.mEDI_D6(T.record_id==participants(i)));
-    B10ml(i,:) = nanmedian(T.Light_B10(T.record_id==participants(i)));
+
     HAhrM(i,:) = nanmedian(T.ha_hr(T.record_id==participants(i)));
     clear boot*
 end
 
 M = table(participants,'VariableNames',{'record_id'});
+
+% Add additional info from survey data
+surveys = surveys(ismember(surveys.record_id,M.record_id),:);
+M.sex = surveys.patient_sex(surveys.redcap_event_name=='visit_1_arm_1');
+M.age = surveys.patient_age_today(surveys.redcap_event_name=='visit_1_arm_1');
+M.Ha = surveys.days_any_ha(surveys.redcap_event_name=='visit_2_arm_1');
+M.BadHa = surveys.days_bad_ha(surveys.redcap_event_name=='visit_2_arm_1');
+M.pedmidas_score = surveys.pedmidas_score(surveys.redcap_event_name=='visit_3_arm_1');
+M.light_scaleOverall = surveys.sensitivity_score(surveys.redcap_event_name=='visit_2_arm_1');
+M.light_averse = surveys.score_light(surveys.redcap_event_name=='visit_2_arm_1');
+M.light_worse = surveys.score_worse(surveys.redcap_event_name=='visit_2_arm_1');
+M.light_avoid = surveys.score_avoid(surveys.redcap_event_name=='visit_2_arm_1');
+M.light_score = sum([M.light_averse M.light_worse M.light_avoid],2);
+M.pain_fear = surveys.fear_score(surveys.redcap_event_name=='visit_2_arm_1');
+M.pain_avoid = surveys.avoid_score(surveys.redcap_event_name=='visit_2_arm_1');
+M.fopqc = surveys.fopqc_score(surveys.redcap_event_name=='visit_2_arm_1');
+
+% add headache features
 M.HaPrct = HaPrct; M.MigPrct = MigPrct; M.DisabilityPrct = DisabilityPrct;
-M.pain_scoreM = pain_scoreM; M.light_scaleM = light_scaleM;
-M.B10m = B10m; M.E3m = E3m; M.D6m = D6m; M.B10ml = B10ml;
-M.B10_250m = B10_250m; M.B10_1000m = B10_1000m;
-M.E3_10m = E3_10m; M.D6_1m = D6_1m; M.HAhrM = HAhrM;
+M.pain_scoreM = pain_scoreM; M.light_scaleM = light_scaleM; M.HAhrM = HAhrM;
+
+% add light measurements
+M.Light = Light; M.mEDI = mEDI; M.B10_1000m = B10_1000m; M.B10_250m = B10_250m;
+M.E3_10m = E3_10m; M.D6_1m = D6_1m;
 clear lightM light_scaleM pain_scoreM *Lo *Hi *Prct boot* mEDImin* LightVar B10* D6* E3*
 
+% add factors to T
+T.fopqc = NaN*ones(height(T),1);
+T.pedmidas = NaN*ones(height(T),1);
+T.age = NaN*ones(height(T),1);
 
+for i = 1:length(participants)
+    T.fopqc(T.record_id==participants(i)) = M.fopqc(i);
+    T.pedmidas(T.record_id==participants(i)) = M.pedmidas_score(i);
+    T.age(T.record_id==participants(i)) = M.age(i);
+end
 
 %% Daytime, evening, night
 
+
 figure
-subplot(1,2,1)
-plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10m,'ok','MarkerFaceColor','y')
-hold on
-plot(1,nanmean(M.B10m),'ys')
-
-plot(2*ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.E3m,'ok','MarkerFaceColor','b')
-plot(2,nanmean(M.E3m),'bs')
-
-plot(3*ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.D6m,'ok','MarkerFaceColor','k')
-plot(3,nanmean(M.D6m),'ks')
-
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 4];
-title('Melanopic EDI by time of day')
-xlabel('Time of Day')
-ylabel('Melanopic EDI (lux)')
-
-subplot(1,2,2)
 plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10_250m,'ok','MarkerFaceColor','y')
 hold on
 plot(1,nanmean(M.B10_250m),'ys')
@@ -287,105 +258,86 @@ title('Melanopic EDI by time of day')
 xlabel('Time of Day')
 ylabel('Proportion of time wih recommended Melanopic EDI levels')
 
-figure
-plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10ml,'ok','MarkerFaceColor','y')
+%% light intensity
 
+figure
+subplot(1,3,1)
+plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.Light,'ok','MarkerFaceColor','y')
+hold on
+plot(1,nanmean(M.Light),'bs')
 ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 2];
-title('Illuminance levels during B10')
-xlabel('Time of Day')
-ylabel('Illuminance (lux)')
+title('Total 24hr Illuminance')
+xlabel('Participants')
+ylabel('Illuminance exposure (lux*hr)')
 
-% Relationship between light sensitivity, light, headache pain, migraine frequency, and
-% disability
+subplot(1,3,2)
+plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10_1000m,'ok','MarkerFaceColor','y')
+hold on
+plot(1,nanmean(M.B10_1000m),'bs')
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 2];
+title('Time of outdoor light exposure')
+xlabel('Participants')
+ylabel('Time >1000 lux (min)')
+
+% light intensity
+subplot(1,3,3)
+plot(M.light_score,M.Light,'ok','MarkerFaceColor','y')
+lsline
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+xlabel('light sensitivity and avoidance score')
+ylabel('Photopic illuminance')
+
+%% HA burden with light metrics
+
+
+
+
+% evening light
 figure
-
-subplot(1,5,1)
-plot(M.light_scaleM,M.pain_scoreM,'.k','MarkerSize',20)
+subplot(1,3,1)
+plot(M.Ha,M.E3_10m,'ok','MarkerFaceColor','w')
 lsline
-[A,B] = corr(M.light_scaleM,M.pain_scoreM,'Type','Spearman');
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-xlabel('light scale (0-5)')
-ylabel('Pain score (0-10)')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 6]; ax.YLim = [0 10];
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+xlabel('No. Headache days/month')
+ylabel('Proportion of evening time <10 lux mEDI')
 
-subplot(1,5,2)
-plot(M.light_scaleM,M.B10ml,'.k','MarkerSize',20)
+subplot(1,3,2)
+plot(M.pedmidas_score,M.E3_10m,'ok','MarkerFaceColor','w')
 lsline
-[A,B] = corr(M.light_scaleM,M.B10ml,'Type','Spearman');
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-xlabel('light scale (0-5)')
-ylabel('Median illuminance Bright 10 hr (lux)')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 6]; ax.YLim = [0 200];
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+xlabel('PedMIDAS score')
+ylabel('Proportion of evening time <10 lux mEDI')
 
-subplot(1,5,3)
-plot(M.DisabilityPrct,M.B10ml,'.k','MarkerSize',20)
+subplot(1,3,3)
+plot(M.light_score,M.E3_10m,'ok','MarkerFaceColor','w')
 lsline
-[A,B] = corr(M.DisabilityPrct,M.B10ml,'Type','Spearman');
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-xlabel('% Days with disability')
-ylabel('Median illuminance Bright 10 hr (lux)')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 1]; ax.YLim = [0 200];
-
-subplot(1,5,4)
-plot(M.MigPrct,M.B10ml,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.MigPrct,M.B10ml,'Type','Spearman');
-xlabel('% Days with migraine')
-ylabel('Median illuminance Bright 10 hr (lux)')
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 1]; ax.YLim = [0 200];
-
-subplot(1,5,5)
-plot(M.HAhrM,M.B10ml,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.HAhrM,M.B10ml,'Type','Spearman');
-xlabel('average duration of headache')
-ylabel('Median illuminance Bright 10 hr (lux)')
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 24]; ax.YLim = [0 200];
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+xlabel('Light Sensitivity and Avoidance score')
+ylabel('Proportion of evening time <10 lux mEDI')
 
 
-figure
+%% Look at correlation between variables
 
-subplot(1,4,1)
-plot(M.light_scaleM,M.B10_250m,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.light_scaleM,M.B10_250m,'Type','Spearman');
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-xlabel('light scale (0-5)')
-ylabel('Median % time >250 melanopic EDI')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 6]; ax.YLim = [0 1];
+[rhoHF, pHF] = corr([M.age M.Ha M.BadHa M.pedmidas_score M.light_scaleOverall M.light_score M.HaPrct M.MigPrct M.DisabilityPrct M.pain_scoreM M.light_scaleM],'type','Spearman');
+[rHFC, pHFC] = corr([M.age M.Ha M.pedmidas_score M.light_scaleOverall M.fopqc]);
+[rLight, pLight] = corr([M.age M.Ha M.light_score M.pedmidas_score M.Light M.B10_1000m M.mEDI M.B10_250m M.E3_10m]);
 
-subplot(1,4,2)
-plot(M.DisabilityPrct,M.B10_250m,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.DisabilityPrct,M.B10_250m,'Type','Spearman');
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-xlabel('% Days with disability')
-ylabel('Median % time >250 melanopic EDI')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 1]; ax.YLim = [0 1];
+%% Mixed effects models by day
+mdl_photoAll = fitlme(T,'Light~disability+light_scale+ha+migraine+(repeat|record_id)');
+mdl_melaAll = fitlme(T,'mEDI~disability+light_scale+ha+migraine+(repeat|record_id)');
+mdl_olAll = fitlme(T,'light_min1000~disability+light_scale+ha+migraine+(repeat|record_id)');
+mdl_bluedayAll = fitlme(T,'mEDI_min250~disability+light_scale+ha+migraine+(repeat|record_id)');
+mdl_blueeveningAll = fitlme(T,'mEDI_max10~disability+light_scale+ha+migraine+(repeat|record_id)');
 
-subplot(1,4,3)
-plot(M.MigPrct,M.B10_250m,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.MigPrct,M.B10_250m,'Type','Spearman');
-xlabel('% Days with migraine')
-ylabel('Median % time >250 melanopic EDI')
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 1]; ax.YLim = [0 1];
+%% Regression models - visual diet predicting frequency, disability, and photophobia
 
-subplot(1,4,4)
-plot(M.HAhrM,M.B10_250m,'.k','MarkerSize',20)
-lsline
-[A,B] = corr(M.HAhrM,M.B10_250m,'Type','Spearman');
-xlabel('average duration of headache')
-ylabel('Median % time >250 melanopic EDI')
-title(['R = ' num2str(A) ', p = ' num2str(B)])
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 24]; ax.YLim = [0 1];
+% Aim 2
+mdl_disablI = fitlm(M,'pedmidas_score~Light+mEDI');
+mdl_photophobiaI = fitlm(M,'light_score~Light+mEDI');
+mdl_HAfreqI = fitlm(M,'Ha~Light+mEDI');
 
-%% Mixed effects models
-
-mdl_lightSens = fitlme(T,'Light~light_scale+(1|record_id)');
-mdl_lightHa = fitlme(T,'Light~pain_score+(1|record_id)');
-mdl_lightDisability = fitlme(T,'Light~disability+(1|record_id)');
-mdl_lightMigraine = fitlme(T,'Light~migraine+(1|record_id)');
+% Aim 3
+mdl_disablT = fitlm(M,'pedmidas_score~B10_250m+E3_10m+D6_1m');
+mdl_photophobiaT = fitlm(M,'light_scaleOverall~B10_250m+E3_10m+D6_1m');
+mdl_HAfreqT = fitlm(M,'Ha~Light+B10_1000m+B10_250m+E3_10m+D6_1m');
+mdl_BHAfreqT = fitlm(M,'BadHa~Light+B10_1000m+B10_250m+E3_10m+D6_1m');
