@@ -11,9 +11,11 @@ participants = fieldnames(headache_diary);
 
 actlumus = struct2cell(actlumus);
 headache_diary = struct2cell(headache_diary);
+surveys = surveys(~isnan(surveys.record_id),:);
 
-bad_trials = [zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7);[0 0 0 0 0 0 1];...
-    zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7);zeros(1,7)];
+% hdp04 = headache_diary{4};% Change p04 light device since they were at LAX practice and always had actlumus with them
+% hdp04.light_device(hdp04.light_device==1) = 0;
+% headache_diary{4} = hdp04;
 
 figure
 for i = 1:length(participants)
@@ -54,7 +56,7 @@ for i = 1:length(participants)
     t.migraine = hd.migraine_today_self_report;
     t.pain_score = hd.pain_score_today_nrs;
     t.pain_score(isnan(t.pain_score)) = 0;
-    t.ha_start = hd.ha_start;
+    t.ha_start = categorical(hd.ha_start);
     t.ha_hr = hd.ha_hr;
     t.light_scale = hd.light_scale;
     t.disability = hd.disability_today;
@@ -81,10 +83,11 @@ for i = 1:length(participants)
     Light = NaN*ones(length(Day),1);
     mEDI = NaN*ones(length(Day),1);
 
+    figure
     for d = 1:length(Day)
         % remove data from days where the device was removed, or there
         % is incomplete data for the day
-        if bad_trials(i,d)==0
+        if t.light_device(d)==0
             for h = 1:24
                 Light_hr(d,h) = nanmedian(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & vd_cleaned.hour==Hours(h))); % photopic light
                 mEDI_hr(d,h) = nanmedian(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & vd_cleaned.hour==Hours(h)));
@@ -118,7 +121,6 @@ for i = 1:length(participants)
     subject_data.mEDI_by_day{:,i} = mEDI_by_day;
     
     
-    subplot(length(participants),1,i)
     hold on
     x = 0:0.01667:24;
     
@@ -130,13 +132,8 @@ for i = 1:length(participants)
         y2 = mEDI_by_day(:,X);
         y2(y2==0) = 0.001;
         y2 = log(y2);
-        if bad_trials(i,X)==0
-            c1 = [0.5 0.5 0];
-            c2 = [0.8 0.8 1];
-        else
-            c1 = [0.5 0.5 0.5];
-            c2 = [0.2 0.2 0.2];
-        end
+        c1 = [0.5 0.5 0.5];
+        c2 = [0.2 0.2 0.2];
         fill([7+(24*(X-1)) 7+(24*(X-1)) 17+(24*(X-1)) 17+(24*(X-1))],log([0.001 100000 100000 0.001]),[1 1 0.8])
         hold on
         fill([20+(24*(X-1)) 20+(24*(X-1)) 23+(24*(X-1)) 23+(24*(X-1))],log([0.001 100000 100000 0.001]),[0.8 0.8 1])
@@ -168,6 +165,9 @@ for i = 1:length(participants)
     end
 end
 
+T.glasses_hr(ismissing(T.glasses_hr)) = "0";
+T.glasses_hr(T.glasses_hr=="") = "0";
+T.glasses_hr = str2double(T.glasses_hr);
 
 participants = unique(T.record_id);
 
@@ -314,6 +314,12 @@ lsline
 ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
 xlabel('Light Sensitivity and Avoidance score')
 ylabel('Proportion of evening time <10 lux mEDI')
+
+
+plot(M.light_score,M.B10_1000m,'ok','MarkerFaceColor','w')
+lsline
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+xlabel('Light Sensitivity and Avoidance score')
 
 
 %% Look at correlation between variables
