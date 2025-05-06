@@ -65,6 +65,11 @@ for i = 1:length(participants)
     t.month = hd.month;
     t.day = hd.day;
     t.year = hd.year;
+    [daynum,dayname] = weekday(datetime(t.year,t.month,t.day));
+    t.daynum = daynum;
+    t.dayname = dayname;
+    t.weekend = zeros(height(t),1);
+    t.weekend(t.daynum==1|t.daynum==7) = 1;
     t.ha = hd.headache_today;
     t.migraine = hd.migraine_today_self_report;
     t.pain_score = hd.pain_score_today_nrs;

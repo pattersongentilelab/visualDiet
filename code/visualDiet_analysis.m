@@ -111,27 +111,41 @@ mdl_CM = fitglm(M,'CM~B10_250m+E3_10m+D6_1m+Light+B10_1000m','Distribution','bin
 lb = 25;
 ub = 975;
 
-temp = subject_data.mEDI_by_day;
+temp = subject_data.light_by_day;
+tempM = subject_data.mEDI_by_day;
 for x = 1:length(temp)
     temp2 = temp{1,x};
+    tempM2 = tempM{1,x};
     xx = 1:1:1440;
     for y = 1:length(xx)-30
         for z = 1:size(temp2,2)
             temp3(z,y) = nanmean(temp2(xx(y):xx(y+29),z));
+            tempM3(z,y) = nanmean(tempM2(xx(y):xx(y+29),z));
         end
     end
     if x == 1
         light_hrAll = temp3;
+        mEDI_hrAll = tempM3;
     else
         light_hrAll = [light_hrAll;temp3];
+        mEDI_hrAll = [mEDI_hrAll;tempM3];
     end
 end
-clear temp*
+clear temp* 
+
+for x = 1:length(participants)
+    light_hrAllm(x,:) = nanmean(light_hrAll(T.record_id==participants(x),:));
+    light_hrAllWDm(x,:) = nanmean(light_hrAll(T.record_id==participants(x) & T.weekend==0,:));
+    light_hrAllWEm(x,:) = nanmean(light_hrAll(T.record_id==participants(x) & T.weekend==1,:));
+    mEDI_hrAllm(x,:) = nanmean(mEDI_hrAll(T.record_id==participants(x),:));
+    mEDI_hrAllWDm(x,:) = nanmean(mEDI_hrAll(T.record_id==participants(x) & T.weekend==0,:));
+    mEDI_hrAllWEm(x,:) = nanmean(mEDI_hrAll(T.record_id==participants(x) & T.weekend==1,:));
+end
 
 figure
 hold on
 x_data = 1/60:1/60:(24-(30/60));
-y_data = light_hrAll(T.CM==0,:);
+y_data = light_hrAllm(M.DisBi==0,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -142,7 +156,7 @@ y_ERR=cat(2,y_dataERR1,fliplr(y_dataERR2));
 TEMP = fill(x_ERR,y_ERR,[0.8 0.8 0.8],'EdgeColor','none');
 plot(x_data,y_dataM,'-','Color','k')
 
-y_data = light_hrAll(T.CM==1,:);
+y_data = light_hrAllm(M.DisBi==1,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
