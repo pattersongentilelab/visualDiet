@@ -3,10 +3,9 @@
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
 data_path = getpref('visualDiet','visualDietDataPath');
-load([data_path '/pilotVD'],'M','T','subject_data')
+load([data_path '/pilotVD'])
 
 participants = unique(M.record_id);
-
 
 %% Daytime, evening, night
 
@@ -86,6 +85,9 @@ ylabel('Time >1000 lux (min)')
 [rHFC, pHFC] = corr([M.age M.Ha M.pedmidas_score M.vlsq8 M.fopqc]);
 [rLight, pLight] = corr([M.age M.Ha M.vlsq8 M.pedmidas_score M.Light M.B10_1000m M.mEDI M.B10_250m M.E3_10m]);
 
+[rhoSl, pSl] = corr([SPL.age SPL.Ha SPL.BadHa SPL.pedmidas_score SPL.fopqc SPL.sleepDis SPL.sleepImp SPL.mEDI SPL.mEDI_B...
+    SPL.TST SPL.WASO SPL.SlEff SPL.sleepOnset SPL.wakeOnset SPL.sleepMidpoint],'type','Spearman');
+
 %% Mixed effects models by day
 mdl_photoAll = fitlme(T,'Light~ha+(repeat|record_id)');
 mdl_melaAll = fitlme(T,'mEDI~disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
@@ -145,7 +147,8 @@ end
 figure
 hold on
 x_data = 1/60:1/60:(24-(30/60));
-y_data = light_hrAllm(M.DisBi==0,:);
+% y_data = mEDI_hrAllm(M.CM==0,:);
+y_data = light_hrAll(T.weekend==0,:)-mEDI_hrAll(T.weekend==0,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -156,7 +159,8 @@ y_ERR=cat(2,y_dataERR1,fliplr(y_dataERR2));
 TEMP = fill(x_ERR,y_ERR,[0.8 0.8 0.8],'EdgeColor','none');
 plot(x_data,y_dataM,'-','Color','k')
 
-y_data = light_hrAllm(M.DisBi==1,:);
+% y_data = mEDI_hrAllm(M.CM==1,:);
+y_data = light_hrAll(T.weekend==1,:)-mEDI_hrAll(T.weekend==1,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -175,3 +179,44 @@ xlabel('Time (hrs)')
 plot([0,6],log([1,1]),'--k')
 plot([20,23],log([10,10]),'--k')
 plot([7,17],log([250,250]),'--k')
+
+mdl_climateLight = fitglme(T,'Light~1 + Precip + Temp + Daylight + (1|record_id)');
+mdl_climate250min = fitglme(T,'mEDI_min250~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
+mdl_climateBL = fitglme(T,'light_min1000~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
+mdl_climateMig = fitglme(T,'migraine~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Binomial');
+mdl_climateHA = fitglme(T,'ha~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Binomial');
+
+mdl_climatePain = fitglme(T,'pain_score~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Poisson');
+
+mdl_climateLightSens = fitglme(T,'light_scale~1 + weekend + Precip + Temp + Daylight + Light + (1|record_id)','Distribution','Poisson');
+
+%% Calculate shifts in 24-hr light cycle
+
+figure
+allm = nanmean(mEDI_hrAll,1);
+PP = -200:200;
+for ii = 1:length(participants)
+    I = nanmean(mEDI_hrAll(T.record_id==participants(ii),:),1);
+
+    for pp = PP
+        cr(pp+max(PP)+1) = corr(allm',circshift(I',pp)); 
+    end
+    [~,idx] = max(cr);
+    shiftVal(ii,:) = PP(idx);
+    fitVal(ii,:) = corr(allm',circshift(I',shiftVal));
+
+    hold on
+    plot(x_data,allm,'-k')
+    hold on
+    plot(x_data,I,'--b')
+    plot(x_data,circshift(I',shiftVal(ii,:)),'--r')
+    pause
+    clf
+end
+
+M.LightShift = shiftVal;
+M.LightShiftFit = fitVal;
+
+SPL.LightShift = M.LightShift(ismember(M.record_id,SPL.record_id));
+
+save([data_path '/pilotVDanalysis'],'M','T','mEDI_hrAll','light_hrAll','subject_data')
