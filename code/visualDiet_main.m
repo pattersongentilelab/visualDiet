@@ -129,9 +129,9 @@ for i = 1:length(participants)
 
             Light(d,1) = sum(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.LIGHT)))./60; % calculate lux*hr
             mEDI(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDI)))./60; % calculate lux*hr
-            mEDI_M(d,1) = mean(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=6 & vd_cleaned.hour<8 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog))); 
-            mEDI_A(d,1) = mean(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=15 & vd_cleaned.hour<18 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog))); 
-            mEDI_B(d,1) = mean(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=21 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)));
+            mEDI_M(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=6 & vd_cleaned.hour<8 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
+            mEDI_A(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=15 & vd_cleaned.hour<18 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
+            mEDI_B(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=21 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60;
             % time period of certain light exposures
             Min250_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>250 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./(10*60);
             Min1000_B10l(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.LIGHT>1000 & vd_cleaned.day==Day(d)));
@@ -354,7 +354,6 @@ M.VsBi(M.vlsq8>24) = 1;
 M.AgeBi = zeros(height(M),1);
 M.AgeBi(M.age>=18) = 1;
 
-
 % add headache features
 M.HaPrct = HaPrct; M.MigPrct = MigPrct; M.DisabilityPrct = DisabilityPrct;
 M.pain_scoreM = pain_scoreM; M.light_scaleM = light_scaleM; M.glasses_hrM = glasses_hrM; 
@@ -449,8 +448,20 @@ for i = 1:height(T)
         T.SlEff(i) = SL.Sleep_efficiency;
         T.WASO(i) = SL.WASO;
         T.SleepMidpoint(i) = SL.sleeponset + ((SL.wakeonset - SL.sleeponset)./2);
+        T.MVPAdur5to10(i) = PA.dur_MVPA_5_10_min;
     end
 end
+T.MVPAdur5to10(isnan(T.SleepMidpoint)) = NaN;
+
+% add variance
+participants_spl = unique(SPL.record_id);
+for i = 1:length(participants_spl)
+    SleepMidpointVar(i,:) = nanvar(T.SleepMidpoint(T.record_id==participants_spl(i)));
+    TSTvar(i,:) = nanvar(T.TST(T.record_id==participants_spl(i)));
+    SlEffVar(i,:) = nanvar(T.SlEff(T.record_id==participants_spl(i)));
+    WASOvar(i,:) = nanvar(T.WASO(T.record_id==participants_spl(i)));
+end
+SPL.SleepMidpointVar = SleepMidpointVar; SPL.TSTvar = TSTvar; SPL.SlEffVar = SlEffVar; SPL.WASOvar = WASOvar;
 
 %% save
 

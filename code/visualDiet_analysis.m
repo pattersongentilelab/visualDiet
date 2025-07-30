@@ -205,18 +205,75 @@ for ii = 1:length(participants)
     shiftVal(ii,:) = PP(idx);
     fitVal(ii,:) = corr(allm',circshift(I',shiftVal));
 
-    hold on
-    plot(x_data,allm,'-k')
-    hold on
-    plot(x_data,I,'--b')
-    plot(x_data,circshift(I',shiftVal(ii,:)),'--r')
-    pause
-    clf
+    % hold on
+    % plot(x_data,allm,'-k')
+    % hold on
+    % plot(x_data,I,'--b')
+    % plot(x_data,circshift(I',shiftVal(ii,:)),'--r')
+    % pause
+    % clf
 end
 
-M.LightShift = shiftVal;
+M.LightShift = shiftVal.*-1;
 M.LightShiftFit = fitVal;
+
+for ii = 1:height(T)
+    I = mEDI_hrAll(ii,:);
+
+    for pp = PP
+        cr(pp+max(PP)+1) = corr(allm',circshift(I',pp)); 
+    end
+    [~,idx] = max(cr);
+    shiftVal_day(ii,:) = PP(idx);
+    fitVal_day(ii,:) = corr(allm',circshift(I',shiftVal));
+end
+
+T.LightShift = shiftVal_day.*-1;
+T.LightShiftFit = fitVal_day;
+T.LightShift(T.LightShiftFit<0.5) = NaN;
 
 SPL.LightShift = M.LightShift(ismember(M.record_id,SPL.record_id));
 
+
+T.SleepMidpoint_priorDay = circshift(T.SleepMidpoint,1);
+T.SleepMidpoint_priorDay(1:7:end) = NaN;
+T.LightShift_nextDay = circshift(T.LightShift,-1);
+T.LightShift_nextDay(7:7:end) = NaN;
+
+T.migraine_nextDay = circshift(T.migraine,-1);
+T.migraine_nextDay(7:7:end) = NaN;
+T.ha_nextDay = circshift(T.ha,-1);
+T.ha_nextDay(7:7:end) = NaN;
+
+T.weekend_night = zeros(height(T.migraine),1);
+T.weekend_night(T.daynum==7|T.daynum==6) = 1;
+
+% add variance
+for i = 1:length(participants)
+    LightShiftVar(i,:) = nanvar(T.LightShift(T.record_id==participants(i)));
+end
+
+M.LightShiftVar = LightShiftVar;
+SPL.LightShiftVar = M.LightShiftVar(ismember(M.record_id,SPL.record_id));
+
+
+mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id)');
+
 save([data_path '/pilotVDanalysis'],'M','T','mEDI_hrAll','light_hrAll','subject_data')
+
+% for x = 1:height(T)
+%     plot(T.SleepMidpoint(x),0.2,'ok')
+%     hold on
+%     plot(T.SleepMidpoint_priorDay(x),0.2,'or')
+%     plot(x_data,mEDI_hrAll(x,:),'-k')
+%     title(num2str(T.LightShift(x)))
+%     pause
+%     clf
+% end
+
+[coeff,score,latent,tsquared,explained,mu] = pca([T.WASO T.SlEff T.SleepMidpoint T.TST]);
+T.pca1_sleep = score(:,1);
+T.pca2_sleep = score(:,2);
+
+T.SleepMidpointMin = T.SleepMidpoint.*60;
+T.TSTmin = T.TST.*60;
