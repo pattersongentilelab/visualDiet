@@ -5,6 +5,8 @@
 data_path = getpref('visualDiet','visualDietDataPath');
 load([data_path '/pilotVD'])
 
+addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
+
 participants = unique(M.record_id);
 
 %% Daytime, evening, night
@@ -261,15 +263,32 @@ mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id
 
 save([data_path '/pilotVDanalysis'],'M','T','mEDI_hrAll','light_hrAll','subject_data')
 
-% for x = 1:height(T)
-%     plot(T.SleepMidpoint(x),0.2,'ok')
-%     hold on
-%     plot(T.SleepMidpoint_priorDay(x),0.2,'or')
-%     plot(x_data,mEDI_hrAll(x,:),'-k')
-%     title(num2str(T.LightShift(x)))
-%     pause
-%     clf
-% end
+figure
+subplot(2,2,1)
+plot(T.SleepMidpoint,T.LightShift,'ok')
+lsline
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+subplot(2,2,2)
+plot(T.SleepMidpoint,T.LightShift_nextDay,'ok')
+lsline
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+subplot(2,2,3)
+hold on
+pp = unique(SPL.record_id);
+mark = {'+k','+r','+b','+m','+c','xk','xr','xb','xm','*c','*k','*r','*b','*m','*c','.k','.r','.b','.m','.c'};
+for x = 1:length(pp)
+    plot(T.SleepMidpoint(T.record_id==pp(x)),T.LightShift(T.record_id==pp(x)),mark{:,x})
+end
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+subplot(2,2,4)
+hold on
+for x = 1:length(pp)
+    plot(T.SleepMidpoint(T.record_id==pp(x)),T.LightShift_nextDay(T.record_id==pp(x)),mark{:,x})
+end
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
 
 [coeff,score,latent,tsquared,explained,mu] = pca([T.WASO T.SlEff T.SleepMidpoint T.TST]);
 T.pca1_sleep = score(:,1);
@@ -277,3 +296,11 @@ T.pca2_sleep = score(:,2);
 
 T.SleepMidpointMin = T.SleepMidpoint.*60;
 T.TSTmin = T.TST.*60;
+
+% calculate sleep midpoint on weekends only
+pSPL = unique(SPL.record_id);
+for x = 1:length(pSPL)
+    SleepMidpointWknd(x,1) = nanmean(T.SleepMidpoint(T.record_id==pSPL(x) & T.weekend_night==1));
+end
+
+SPL.SleepMidpointWknd = SleepMidpointWknd;

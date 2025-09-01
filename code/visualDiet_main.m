@@ -9,6 +9,7 @@ load([data_path 'surveyDataFixed.mat'])
 load([data_path '/sleepPA_M.mat'])
 load([data_path '/sleepPA_T'],'paT','sleepT')
 load([data_path '/weatherNov24toMarch25.mat'])
+load([data_path '/haQuestionnaireVD'],'haQ')
 
 participants = fieldnames(headache_diary);
 
@@ -24,6 +25,7 @@ hdp19 = headache_diary{19};% Change p19 light device since there is no signal fr
 hdp19.light_device(4) = 1;
 headache_diary{19} = hdp19;
 
+
 figure
 
 for i = 1:length(participants)
@@ -37,6 +39,7 @@ for i = 1:length(participants)
     hd.repeat = hd.redcap_repeat_instance;
     vd.hour = hour(vd.TIME);
     vd.min = minute(vd.TIME);
+
 
 
     % correct days where the headache diary was filled out the following day
@@ -116,6 +119,9 @@ for i = 1:length(participants)
     mEDI = NaN*ones(length(Day),1);
     cont_mEDI = NaN*ones(7,2040);
     cont_mEDItime = NaT([7 2040],"Format","hh:mm:ss");
+    Nonwear = zeros(length(Day),1);
+    wearDay = zeros(length(Day),1);
+    Nightstand = zeros(length(Day),1);
    
     for d = 1:length(Day)
         % remove data from days where the device was removed, or there
@@ -132,6 +138,7 @@ for i = 1:length(participants)
             mEDI_M(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=6 & vd_cleaned.hour<8 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
             mEDI_A(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=15 & vd_cleaned.hour<18 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
             mEDI_B(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=21 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60;
+
             % time period of certain light exposures
             Min250_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>250 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./(10*60);
             Min1000_B10l(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.LIGHT>1000 & vd_cleaned.day==Day(d)));
@@ -353,6 +360,30 @@ M.VsBi = zeros(height(M),1);
 M.VsBi(M.vlsq8>24) = 1;
 M.AgeBi = zeros(height(M),1);
 M.AgeBi(M.age>=18) = 1;
+M.ha_sleep = haQ.ha_sleep;
+M.cont = haQ.p_current_ha_pattern;
+M.vis_spots = haQ.vision_aura_sx_baseline___spot;
+M.vis_stars = haQ.vision_aura_sx_baseline___star;
+M.vis_spots = haQ.vision_aura_sx_baseline___spot;
+M.vis_flash = haQ.vision_aura_sx_baseline___light;
+M.vis_zigzag = haQ.vision_aura_sx_baseline___zigzag;
+M.vis_blurry = haQ.vision_aura_sx_baseline___blur;
+M.vis_double = haQ.vision_aura_sx_baseline___double_vis;
+M.vis_heat = haQ.vision_aura_sx_baseline___heat;
+M.weak = haQ.assoc_sx_neuro_bil___weak;
+M.nausea = haQ.assoc_sx_gi___naus;
+M.vomiting = haQ.assoc_sx_gi___vomiting;
+M.assoc_light = haQ.associated_sx___light;
+M.assoc_sound = haQ.associated_sx___sound;
+M.assoc_smell = haQ.associated_sx___smell;
+M.assoc_lighthead = haQ.associated_sx___lighthead;
+M.assoc_spinning = haQ.associated_sx___spinning;
+M.assoc_balance = haQ.associated_sx___balance;
+M.assoc_hear = haQ.associated_sx___hear;
+M.assoc_ringing = haQ.associated_sx___ringing;
+M.assoc_neckpain = haQ.associated_sx___neck_pain;
+M.assoc_thinking = haQ.associated_sx___think;
+M.assoc_talking = haQ.associated_sx___talk;
 
 % add headache features
 M.HaPrct = HaPrct; M.MigPrct = MigPrct; M.DisabilityPrct = DisabilityPrct;
@@ -456,10 +487,10 @@ T.MVPAdur5to10(isnan(T.SleepMidpoint)) = NaN;
 % add variance
 participants_spl = unique(SPL.record_id);
 for i = 1:length(participants_spl)
-    SleepMidpointVar(i,:) = nanvar(T.SleepMidpoint(T.record_id==participants_spl(i)));
-    TSTvar(i,:) = nanvar(T.TST(T.record_id==participants_spl(i)));
-    SlEffVar(i,:) = nanvar(T.SlEff(T.record_id==participants_spl(i)));
-    WASOvar(i,:) = nanvar(T.WASO(T.record_id==participants_spl(i)));
+    SleepMidpointVar(i,:) = nanstd(T.SleepMidpoint(T.record_id==participants_spl(i)));
+    TSTvar(i,:) = nanstd(T.TST(T.record_id==participants_spl(i)));
+    SlEffVar(i,:) = nanstd(T.SlEff(T.record_id==participants_spl(i)));
+    WASOvar(i,:) = nanstd(T.WASO(T.record_id==participants_spl(i)));
 end
 SPL.SleepMidpointVar = SleepMidpointVar; SPL.TSTvar = TSTvar; SPL.SlEffVar = SlEffVar; SPL.WASOvar = WASOvar;
 
