@@ -3,57 +3,41 @@
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
 data_path = getpref('visualDiet','visualDietDataPath');
-load([data_path '/pilotVDwearRemoveBad'])
+load([data_path '/pilotVD'])
 
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
 participants = unique(M.record_id);
 
+%% Look at correlation between variables
 
-%% Light Timing
+[rhoHF, pHF] = corr([M.age M.Ha M.BadHa M.pedmidas_score M.vlsq8 M.HaPrct M.MigPrct M.DisabilityPrct M.pain_scoreM M.light_scaleM],'type','Spearman');
+[rHFC, pHFC] = corr([M.age M.Ha M.pedmidas_score M.vlsq8 M.fopqc]);
+[rLight, pLight] = corr([M.age M.Ha M.vlsq8 M.pedmidas_score M.Light M.B10_1000m M.mEDI M.B10_250m M.E3_10m]);
 
+[rhoSl, pSl] = corr([SPL.age SPL.Ha SPL.BadHa SPL.pedmidas_score SPL.fopqc SPL.sleepDis SPL.sleepImp SPL.mEDI SPL.mEDI_B...
+    SPL.TST SPL.WASO SPL.SlEff SPL.sleepOnset SPL.wakeOnset SPL.sleepMidpoint],'type','Spearman');
 
-figure
-plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10_250m,'ok','MarkerFaceColor','y')
-hold on
-plot(1,nanmean(M.B10_250m),'ys')
+%% Mixed effects models by day
+mdl_photoAll = fitlme(T,'Light~ha+(repeat|record_id)');
+mdl_melaAll = fitlme(T,'mEDI~disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
+mdl_olAll = fitlme(T,'light_min1000~disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
+mdl_bluedayAll = fitlme(T,'mEDI_min250~age+disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
+mdl_blueeveningAll = fitlme(T,'mEDI_max10~age+disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
 
-plot(2*ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.E3_10m,'ok','MarkerFaceColor','b')
-plot(2,nanmean(M.E3_10m),'bs')
+%% Regression models - visual diet predicting frequency, disability, and photophobia
 
-plot(3*ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.D6_1m,'ok','MarkerFaceColor','k')
-plot(3,nanmean(M.D6_1m),'ks')
+% Aim 2
+mdl_disablI = fitlm(M,'pedmidas_score~Light+B10_1000m');
+mdl_HAfreqI = fitlm(M,'Ha~Light+B10_1000m');
+mdl_BHAfreqI = fitlm(M,'BadHa~Light+B10_1000m');
 
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 4.5]; ax.YLim = [0 1.1];
-title('Melanopic EDI by time of day')
-xlabel('Time of Day')
-ylabel('Time spent within recommended mEDI (%)')
-
-
-
-
-%% light intensity
-
-figure
-subplot(1,2,1)
-plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.Light,'ok','MarkerFaceColor','y')
-hold on
-plot(1,mean(M.Light),'bs')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 2];
-ax.YTick = 0:2000:16000; ax.YTickLabels = 0:2:16;
-title('Total 24hr Illuminance')
-xlabel('Participants')
-ylabel('Illuminance exposure (klux*hr)')
-
-subplot(1,2,2)
-plot(ones(length(participants),1)+0.1*(rand(length(participants),1)-0.5),M.B10_1000m,'ok','MarkerFaceColor','y')
-hold on
-plot(1,mean(M.B10_1000m),'bs')
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0 2];
-title('Time of outdoor light exposure')
-xlabel('Participants')
-ylabel('Time >1000 lux (min)')
-
+% Aim 3
+mdl_disablT = fitlm(M,'pedmidas_score~B10_250m+E3_10m+D6_1m');
+mdl_fopT = fitlm(M,'fopqc~B10_250m+E3_10m+D6_1m');
+mdl_HAfreqT = fitlm(M,'Ha~B10_250m+E3_10m+D6_1m');
+mdl_BHAfreqT = fitlm(M,'BadHa~B10_250m+E3_10m+D6_1m');
+mdl_CM = fitglm(M,'CM~B10_250m+E3_10m+D6_1m+Light+B10_1000m','Distribution','binomial');
 
 %% Compare light levels on migraine days and non-migraine days
 lb = 25;
@@ -79,14 +63,7 @@ for x = 1:length(temp)
         mEDI_hrAll = [mEDI_hrAll;tempM3];
     end
 end
-clear temp*
-
- light_hrAllm = NaN*ones(length(participants),length(light_hrAll));
- light_hrAllWDm = NaN*ones(length(participants),length(light_hrAll));
- light_hrAllWEm = NaN*ones(length(participants),length(light_hrAll));
- mEDI_hrAllm = NaN*ones(length(participants),length(light_hrAll));
- mEDI_hrAllWDm = NaN*ones(length(participants),length(light_hrAll));
- mEDI_hrAllWEm = NaN*ones(length(participants),length(light_hrAll));
+clear temp* 
 
 for x = 1:length(participants)
     light_hrAllm(x,:) = nanmean(light_hrAll(T.record_id==participants(x),:));
@@ -101,7 +78,7 @@ figure
 hold on
 x_data = 1/60:1/60:(24-(30/60));
 % y_data = mEDI_hrAllm(M.CM==0,:);
-y_data = light_hrAll(T.GoodDay==1,:);
+y_data = light_hrAll(T.GoodNight==1,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -113,7 +90,7 @@ TEMP = fill(x_ERR,y_ERR,[0.8 0.8 0.8],'EdgeColor','none');
 plot(x_data,y_dataM,'-','Color','k')
 
 % y_data = mEDI_hrAllm(M.CM==1,:);
-y_data = light_hrAll(T.GoodDay==0,:);
+y_data = light_hrAll(T.GoodNight==0,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -133,8 +110,6 @@ plot([0,6],log([1,1]),'--k')
 plot([20,23],log([10,10]),'--k')
 plot([7,17],log([250,250]),'--k')
 
-%% Climate and light comparison
-
 mdl_climateLight = fitglme(T,'Light~1 + Precip + Temp + Daylight + (1|record_id)');
 mdl_climate250min = fitglme(T,'mEDI_min250~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
 mdl_climateBL = fitglme(T,'light_min1000~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
@@ -147,6 +122,7 @@ mdl_climateLightSens = fitglme(T,'light_scale~1 + weekend + Precip + Temp + Dayl
 
 %% Calculate shifts in 24-hr light cycle
 
+figure
 allm = nanmean(mEDI_hrAll,1);
 PP = -200:200;
 for ii = 1:length(participants)
@@ -159,7 +135,6 @@ for ii = 1:length(participants)
     shiftVal(ii,:) = PP(idx);
     fitVal(ii,:) = corr(allm',circshift(I',shiftVal));
 
-    % figure(100)
     % hold on
     % plot(x_data,allm,'-k')
     % hold on
@@ -187,9 +162,13 @@ T.LightShift = shiftVal_day.*-1;
 T.LightShiftFit = fitVal_day;
 T.LightShift(T.LightShiftFit<0.5) = NaN;
 
-
 T.LightShift_nextDay = circshift(T.LightShift,-1);
 T.LightShift_nextDay(7:7:end) = NaN;
+
+SPL.LightShift = M.LightShift(ismember(M.record_id,SPL.record_id));
+
+T.SleepMidpoint_priorDay = circshift(T.SleepMidpoint,1);
+T.SleepMidpoint_priorDay(1:7:end) = NaN;
 
 T.migraine_nextDay = circshift(T.migraine,-1);
 T.migraine_nextDay(7:7:end) = NaN;
@@ -205,26 +184,51 @@ for i = 1:length(participants)
 end
 
 M.LightShiftVar = LightShiftVar;
+SPL.LightShiftVar = M.LightShiftVar(ismember(M.record_id,SPL.record_id));
 
-% Plot light shift as a function of migraine and headache days
+
+mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id)');
+
+save([data_path '/pilotVDanalysis'],'M','T','mEDI_hrAll','light_hrAll','subject_data')
 
 figure
-subplot(2,1,1)
-plot(M.LightShift,M.Ha,'ok','MarkerFaceColor','k')
-hold on
+subplot(2,2,1)
+plot(T.SleepMidpoint,T.LightShift,'ok')
 lsline
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.YLim = [0 31]; ax.XLim = [-200,200];
-xlabel('Headache days per month')
-ylabel('Light Shift')
-[r,p] = corr(M.LightShift,M.Ha,'Type','Spearman');
-title(['r = ' num2str(r) ', p = ' num2str(p)])
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
 
-subplot(2,1,2)
-plot(M.LightShift,M.BadHa,'ok','MarkerFaceColor','k')
-hold on
+subplot(2,2,2)
+plot(T.SleepMidpoint,T.LightShift_nextDay,'ok')
 lsline
-ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.YLim = [0 31]; ax.XLim = [-200,200];
-xlabel('Bad headache days per month')
-ylabel('Light Shift')
-[r,p] = corr(M.LightShift,M.BadHa,'Type','Spearman');
-title(['r = ' num2str(r) ', p = ' num2str(p)])
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+subplot(2,2,3)
+hold on
+pp = unique(SPL.record_id);
+mark = {'+k','+r','+b','+m','+c','xk','xr','xb','xm','*c','*k','*r','*b','*m','*c','.k','.r','.b','.m','.c'};
+for x = 1:length(pp)
+    plot(T.SleepMidpoint(T.record_id==pp(x)),T.LightShift(T.record_id==pp(x)),mark{:,x})
+end
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+subplot(2,2,4)
+hold on
+for x = 1:length(pp)
+    plot(T.SleepMidpoint(T.record_id==pp(x)),T.LightShift_nextDay(T.record_id==pp(x)),mark{:,x})
+end
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off';
+
+[coeff,score,latent,tsquared,explained,mu] = pca([T.WASO T.SlEff T.SleepMidpoint T.TST]);
+T.pca1_sleep = score(:,1);
+T.pca2_sleep = score(:,2);
+
+T.SleepMidpointMin = T.SleepMidpoint.*60;
+T.TSTmin = T.TST.*60;
+
+% calculate sleep midpoint on weekends only
+pSPL = unique(SPL.record_id);
+for x = 1:length(pSPL)
+    SleepMidpointWknd(x,1) = nanmean(T.SleepMidpoint(T.record_id==pSPL(x) & T.weekend_night==1));
+end
+
+SPL.SleepMidpointWknd = SleepMidpointWknd;

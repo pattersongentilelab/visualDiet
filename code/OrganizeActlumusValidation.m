@@ -4,7 +4,7 @@ data_path = getpref('visualDiet','visualDietDataPath');
 Actlumus = {};
 LightDiary = {};
 
-for X = 1:3
+for X = 1:4
     switch X
         case 1
             load([data_path '/Actlumus/Actlumus validation/actlumusValidationCPG.mat'])
@@ -12,6 +12,8 @@ for X = 1:3
             load([data_path '/Actlumus/Actlumus validation/actlumusValidationBMP.mat'])
         case 3
             load([data_path '/Actlumus/Actlumus validation/actlumusValidationNRR.mat'])
+        case 4
+            load([data_path '/Actlumus/Actlumus validation/actlumusValidationCLS.mat'])
     end
 
     actlumus.IRphoto = actlumus.IR./actlumus.LIGHT;
@@ -23,7 +25,7 @@ for X = 1:3
     
     % select actlumus data within the time window of light diary recordings
     actlumus = actlumus(actlumus.DATETIME<=max(lightDiary.date) & actlumus.DATETIME>=min(lightDiary.date),:);
-    
+
     % convert light diary variables to numbers
     lightDiary.wear = zeros(height(lightDiary),1); % nonwear = 0
     lightDiary.wear(lightDiary.activity_type=='wear') = 1; % wear = 1
@@ -53,8 +55,6 @@ for X = 1:3
     lightDiary.beddown = zeros(height(lightDiary),1); % 1 = actlumus upsidedown on bedside table
     lightDiary.beddown(lightDiary.night_act=="beddown") = 1;
 
-
-
     
     % combine light diary with actlumus data
     actlumus.wear = NaN*ones(height(actlumus),1); % 0 = nonwear, 1 = wear, -1 = sleep
@@ -62,16 +62,6 @@ for X = 1:3
     actlumus.environment = NaN*ones(height(actlumus),1); % outdoor, indoor, dark
     actlumus.shirt = zeros(height(actlumus),1); % 0 no, 1 yes
     actlumus.beddown = zeros(height(actlumus),1); % 0 no, 1 yes
-
-    % make lower temporal resolution version of actlumus data
-    bin_size = 30; % number of minutes passed for each time epoch
-    if bin_size>0
-        for x = 1:height(actlumus)-bin_size
-            actlumus.ORIENTATION(x) = mode(actlumus.ORIENTATION(actlumus.DATETIME==actlumus.DATETIME(x) & actlumus.MS>=actlumus.MS(x) & actlumus.MS<actlumus.MS(x+bin_size)));
-            actlumus.TAT(x) = median(actlumus.TAT(actlumus.DATETIME==actlumus.DATETIME(x) & actlumus.MS>=actlumus.MS(x) & actlumus.MS<actlumus.MS(x+bin_size)));
-            actlumus.LIGHT(x) = median(actlumus.LIGHT(actlumus.DATETIME==actlumus.DATETIME(x) & actlumus.MS>=actlumus.MS(x) & actlumus.MS<actlumus.MS(x+bin_size)));
-        end
-    end
 
     
     for i = 1:height(lightDiary)
@@ -108,10 +98,8 @@ for X = 1:3
 
     if X == 1
         actlumusAll = actlumus;
-        actlumusAll2 = actlumus;
     else
         actlumusAll = [actlumusAll;actlumus];
-        actlumusAll2 = [actlumusAll2;actlumus];
     end
 
 end
@@ -126,29 +114,59 @@ actlumusAll.testData = zeros(height(actlumusAll),1);
 actlumusAll.testData(ismember(actlumusAll.DATETIME,cpg_testDates) & actlumusAll.tester==1) = 1;
 
 %% build outcomes
-actlumusAll.daytime = minutes(actlumusAll.MS);
+[h,m,s] = hms(actlumusAll.MS);
+actlumusAll.daytime = (h.*60) + m;
+actlumusAll.daytimeBi = zeros(height(actlumusAll),1);
+actlumusAll.daytimeBi(h>6 & h<22) = 1;
 actlumusAll.wearLabel = categorical(actlumusAll.wear,-1:1:1,{'night','non-wear','wear'});
-actlumusAll.wear2 = actlumusAll.wear;
-actlumusAll.wear2(actlumusAll.beddown==1) = 0;
-actlumusAll.wearLabel2 = categorical(actlumusAll.wear2,-1:1:1,{'night','non-wear','wear'});
-%actlumusAll.wearLabel2 = categorical(actlumusAll.wear2,-1:1:1,{'night_noncomp','night','non-wear','wear'});
 
 %% define cut-points
 
-actlumusAll.outdoor = zeros(height(actlumusAll),1);
-actlumusAll.outdoor(actlumusAll.LIGHT>442) = 1;
-actlumusAll.hang = zeros(height(actlumusAll),1);
-actlumusAll.hang(actlumusAll.ORIENTATION==2) = 1;
-actlumusAll.up = zeros(height(actlumusAll),1);
-actlumusAll.up(actlumusAll.ORIENTATION==16) = 1;
-actlumusAll.down = zeros(height(actlumusAll),1);
-actlumusAll.down(actlumusAll.ORIENTATION==32) = 1;
-actlumusAll.move = zeros(height(actlumusAll),1);
-actlumusAll.move(actlumusAll.TAT>0) = 1;
-actlumusAll.dark = zeros(height(actlumusAll),1);
-actlumusAll.dark(actlumusAll.LIGHT<=1) = 1;
+actlumusAll.indoor = zeros(height(actlumusAll),1);
+actlumusAll.indoor(actlumusAll.LIGHT<442) = 1;
 actlumusAll.hiIR = zeros(height(actlumusAll),1);
 actlumusAll.hiIR(actlumusAll.IRphoto>0.0008) = 1;
 
+actlumusAll.hang = zeros(height(actlumusAll),1);
+actlumusAll.up = zeros(height(actlumusAll),1);
+actlumusAll.down = zeros(height(actlumusAll),1);
+actlumusAll.move = zeros(height(actlumusAll),1);
+actlumusAll.dark = zeros(height(actlumusAll),1);
 
-save([data_path '/Actlumus/Actlumus validation/actlumusValidationAllbin30.mat'],'actlumusAll','Actlumus','LightDiary')
+actlumusAll.wearBi = zeros(height(actlumusAll),1);
+actlumusAll.wearBi(actlumusAll.wearLabel=='wear') = 1;
+actlumusAll.wearBiLabel = categorical(actlumusAll.wearBi,[0,1],{'non-wear','wear'});
+
+actlumusAll.nightBi = zeros(height(actlumusAll),1);
+actlumusAll.nightBi(actlumusAll.wearLabel=='night') = 1;
+actlumusAll.nightBiLabel = categorical(actlumusAll.nightBi,[0,1],{'non-night','night'});
+
+% make lower temporal resolution version of actlumus data to determine wear
+% vs. non-wear
+bin_size = 0; % define binsize for cut-points
+for x = floor((bin_size/2))+1:height(actlumusAll)-floor((bin_size/2))
+    epoch = actlumusAll(x-floor((bin_size/2)):x+floor((bin_size/2)),:);
+
+    if mode(epoch.ORIENTATION)<32
+        actlumusAll.up(x) = 1;
+    end
+
+    if mode(epoch.ORIENTATION)==32
+        actlumusAll.down(x) = 1;
+    end
+
+    if ~isempty(epoch.ORIENTATION(epoch.ORIENTATION==2))
+        actlumusAll.hang(x) = 1;
+    end
+
+    if median(epoch.LIGHT)<=1
+        actlumusAll.dark(x) = 1;
+    end
+
+    if mean(epoch.TAT)>0
+        actlumusAll.move(x) = 1;
+    end
+
+end
+
+save([data_path '/Actlumus/Actlumus validation/actlumusValidationAllbin1.mat'],'actlumusAll','Actlumus','LightDiary')
