@@ -3,45 +3,22 @@
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
 data_path = getpref('visualDiet','visualDietDataPath');
-load([data_path '/pilotVD'])
+load([data_path '/pilotVDgrant'])
 
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
 participants = unique(M.record_id);
 
-%% Look at correlation between variables
+T.LightHr = T.mEDI_min250*10;
+M.LightHr = M.B10_250m*10;
+SPL.LightHr = SPL.B10_250m*10;
 
-[rhoHF, pHF] = corr([M.age M.Ha M.BadHa M.pedmidas_score M.vlsq8 M.HaPrct M.MigPrct M.DisabilityPrct M.pain_scoreM M.light_scaleM],'type','Spearman');
-[rHFC, pHFC] = corr([M.age M.Ha M.pedmidas_score M.vlsq8 M.fopqc]);
-[rLight, pLight] = corr([M.age M.Ha M.vlsq8 M.pedmidas_score M.Light M.B10_1000m M.mEDI M.B10_250m M.E3_10m]);
-
-[rhoSl, pSl] = corr([SPL.age SPL.Ha SPL.BadHa SPL.pedmidas_score SPL.fopqc SPL.sleepDis SPL.sleepImp SPL.mEDI SPL.mEDI_B...
-    SPL.TST SPL.WASO SPL.SlEff SPL.sleepOnset SPL.wakeOnset SPL.sleepMidpoint],'type','Spearman');
 
 %% Mixed effects models by day
-mdl_photoAll = fitlme(T,'Light~ha+(repeat|record_id)');
-mdl_melaAll = fitlme(T,'mEDI~disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
-mdl_olAll = fitlme(T,'light_min1000~disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
-mdl_bluedayAll = fitlme(T,'mEDI_min250~age+disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
-mdl_blueeveningAll = fitlme(T,'mEDI_max10~age+disability+light_scale+ha+migraine+glasses_hr+(repeat|record_id)');
+mdl_melaAll = fitlme(T,'mEDI_min250~light_scale+(repeat|record_id)');
 
-%% Regression models - visual diet predicting frequency, disability, and photophobia
 
-% Aim 2
-mdl_disablI = fitlm(M,'pedmidas_score~Light+B10_1000m');
-mdl_HAfreqI = fitlm(M,'Ha~Light+B10_1000m');
-mdl_BHAfreqI = fitlm(M,'BadHa~Light+B10_1000m');
-
-% Aim 3
-mdl_disablT = fitlm(M,'pedmidas_score~B10_250m+E3_10m+D6_1m');
-mdl_fopT = fitlm(M,'fopqc~B10_250m+E3_10m+D6_1m');
-mdl_HAfreqT = fitlm(M,'Ha~B10_250m+E3_10m+D6_1m');
-mdl_BHAfreqT = fitlm(M,'BadHa~B10_250m+E3_10m+D6_1m');
-mdl_CM = fitglm(M,'CM~B10_250m+E3_10m+D6_1m+Light+B10_1000m','Distribution','binomial');
-
-%% Compare light levels on migraine days and non-migraine days
-lb = 25;
-ub = 975;
+%% calculate 24-hr light shift
 
 temp = subject_data.light_by_day;
 tempM = subject_data.mEDI_by_day;
@@ -63,7 +40,14 @@ for x = 1:length(temp)
         mEDI_hrAll = [mEDI_hrAll;tempM3];
     end
 end
-clear temp* 
+clear temp*
+
+ light_hrAllm = NaN*ones(length(participants),length(light_hrAll));
+ light_hrAllWDm = NaN*ones(length(participants),length(light_hrAll));
+ light_hrAllWEm = NaN*ones(length(participants),length(light_hrAll));
+ mEDI_hrAllm = NaN*ones(length(participants),length(light_hrAll));
+ mEDI_hrAllWDm = NaN*ones(length(participants),length(light_hrAll));
+ mEDI_hrAllWEm = NaN*ones(length(participants),length(light_hrAll));
 
 for x = 1:length(participants)
     light_hrAllm(x,:) = nanmean(light_hrAll(T.record_id==participants(x),:));
@@ -74,53 +58,6 @@ for x = 1:length(participants)
     mEDI_hrAllWEm(x,:) = nanmean(mEDI_hrAll(T.record_id==participants(x) & T.weekend==1,:));
 end
 
-figure
-hold on
-x_data = 1/60:1/60:(24-(30/60));
-% y_data = mEDI_hrAllm(M.CM==0,:);
-y_data = light_hrAll(T.GoodNight==1,:);
-bootval=bootstrp(1000,@nanmean,y_data);
-bootval=sort(bootval);
-y_dataM=bootval(500,:);
-y_dataERR1=bootval(lb,:);
-y_dataERR2=bootval(ub,:);
-x_ERR=cat(2,x_data,fliplr(x_data));
-y_ERR=cat(2,y_dataERR1,fliplr(y_dataERR2));
-TEMP = fill(x_ERR,y_ERR,[0.8 0.8 0.8],'EdgeColor','none');
-plot(x_data,y_dataM,'-','Color','k')
-
-% y_data = mEDI_hrAllm(M.CM==1,:);
-y_data = light_hrAll(T.GoodNight==0,:);
-bootval=bootstrp(1000,@nanmean,y_data);
-bootval=sort(bootval);
-y_dataM=bootval(500,:);
-y_dataERR1=bootval(lb,:);
-y_dataERR2=bootval(ub,:);
-x_ERR=cat(2,x_data,fliplr(x_data));
-y_ERR=cat(2,y_dataERR1,fliplr(y_dataERR2));
-TEMP = fill(x_ERR,y_ERR,[1 0.8 0.8],'EdgeColor','none');
-plot(x_data,y_dataM,'-','Color','r')
-
-ax=gca; ax.TickDir='out'; ax.Box='off'; ax.XLim = [0,24]; ax.YLim = log([0.01,1200]);
-ax.XTick = 0:6:23; ax.XTickLabels = {'12a','6a','12p','6p'};
-ax.YTick = log([0.01 0.1 1 10 100 1000]); ax.YTickLabels = [0 0.1 1 10 100 1000];
-ylabel('Light')
-xlabel('Time (hrs)')
-plot([0,6],log([1,1]),'--k')
-plot([20,23],log([10,10]),'--k')
-plot([7,17],log([250,250]),'--k')
-
-mdl_climateLight = fitglme(T,'Light~1 + Precip + Temp + Daylight + (1|record_id)');
-mdl_climate250min = fitglme(T,'mEDI_min250~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
-mdl_climateBL = fitglme(T,'light_min1000~1 + weekend + Precip + Temp + Daylight + (1|record_id)');
-mdl_climateMig = fitglme(T,'migraine~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Binomial');
-mdl_climateHA = fitglme(T,'ha~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Binomial');
-
-mdl_climatePain = fitglme(T,'pain_score~1 + weekend + Precip + Temp + Daylight + (1|record_id)','Distribution','Poisson');
-
-mdl_climateLightSens = fitglme(T,'light_scale~1 + weekend + Precip + Temp + Daylight + Light + (1|record_id)','Distribution','Poisson');
-
-%% Calculate shifts in 24-hr light cycle
 
 figure
 allm = nanmean(mEDI_hrAll,1);
@@ -170,6 +107,12 @@ SPL.LightShift = M.LightShift(ismember(M.record_id,SPL.record_id));
 T.SleepMidpoint_priorDay = circshift(T.SleepMidpoint,1);
 T.SleepMidpoint_priorDay(1:7:end) = NaN;
 
+T.light_scale_priorDay = circshift(T.light_scale,1);
+T.light_scale_priorDay(1:7:end) = NaN;
+
+T.LightHr_nextDay = circshift(T.LightHr,-1);
+T.LightHr_nextDay(7:7:end) = NaN;
+
 T.migraine_nextDay = circshift(T.migraine,-1);
 T.migraine_nextDay(7:7:end) = NaN;
 T.ha_nextDay = circshift(T.ha,-1);
@@ -186,10 +129,22 @@ end
 M.LightShiftVar = LightShiftVar;
 SPL.LightShiftVar = M.LightShiftVar(ismember(M.record_id,SPL.record_id));
 
+%% Look at correlation between variables
+
+[rLight, pLight] = corr([M.Ha M.vlsq8 M.fopqc M.pedmidas_score M.B10_500m M.mEDI M.B10_250m],'Type','Spearman');
+
+Tcleaned = T(~isnan(T.MVPAdur5to10),:);
+[rAll, pAll] = corr([Tcleaned.mEDI_min500 Tcleaned.mEDI Tcleaned.mEDI_min250 Tcleaned.MVPAdur5to10 Tcleaned.TST Tcleaned.WASO Tcleaned.SlEff]);
+
+[rSl, pSl] = corr([SPL.sleepDis SPL.sleepImp SPL.B10_250m SPL.TST SPL.WASO SPL.SlEff SPL.sleepMidpoint SPL.MVPAdur5to10 SPL.vlsq8 SPL.fopqc],'Type','Spearman');
+
+[rhoSl2, pSl2] = corr([SPL.B10_250m SPL.sleepDis SPL.sleepImp],'Type','Spearman');
+
+%% calculate day-to-day predictions
+
+fMdl = fitglm(T,'LightHr_nextDay ~ light_scale');
 
 mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id)');
-
-save([data_path '/pilotVDanalysis'],'M','T','mEDI_hrAll','light_hrAll','subject_data')
 
 figure
 subplot(2,2,1)
@@ -232,3 +187,22 @@ for x = 1:length(pSPL)
 end
 
 SPL.SleepMidpointWknd = SleepMidpointWknd;
+
+% plot sleep midpoint
+
+figure
+plot(ones(size(SPL.sleepMidpoint))+(rand(size(SPL.sleepMidpoint))-0.5).*0.05,SPL.sleepMidpoint,'ok','MarkerFaceColor',[0.5 0.5 0.5])
+hold on
+errorbar(1,mean(SPL.sleepMidpoint),std(SPL.sleepMidpoint),'ok')
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0.9 1.1];
+
+
+% plot vlsq-8
+
+figure
+plot(ones(size(M.vlsq8))+(rand(size(M.vlsq8))-0.5).*0.05,M.vlsq8,'ok','MarkerFaceColor',[0.5 0.5 0.5])
+hold on
+errorbar(1,mean(M.vlsq8),std(M.vlsq8),'ok')
+ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0.9 1.1];
+
+

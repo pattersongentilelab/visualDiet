@@ -55,24 +55,23 @@ end
 % end
 
 %% outdoor model
-testData = actlumusAll(actlumusAll.environment<2,:);
-mdlLRout = fitglm(testData,'environment ~ indoor','Distribution','binomial');
-scoresMdlLRout = mdlLRout.Fitted.Probability;
-[predLabelLRout,scoresMdlLRout] = predict(mdlLRout,testData);
-trueLabelLRout = testData.indoor;
-rocObjLRout = rocmetrics(trueLabelLRout,scoresMdlLRout,1,'NumBootstraps',100);
+testData2 = actlumusAll(~isnan(actlumusAll.indoorReal),:);
+mdlIndoor = fitglm(testData2,'indoorReal ~ indoorBlue','Distribution','binomial');
+[predLabelIndoor,scoresMdlIndoor] = predict(mdlIndoor,testData2);
+trueLabelIndoor = testData2.indoorReal;
+rocObjIndoor = rocmetrics(trueLabelIndoor,scoresMdlIndoor(:,1),1);
+predLabelIndoor  = round(predLabelIndoor);
 figure
-plot(rocObjLRout,'ShowConfidenceIntervals',true)
-CMout = confusionmat(trueLabelLRout,predLabelLRout);
-figure
-confusionchart(CMout)
+plot(rocObjIndoor)
 
-ssLR = NaN*ones(size(CMout,1),1);
-for i = 1:size(CMout,1)
-    TP = CMout(i,i);
-    FP = sum(CMout(:,i))-TP;
-    FN = sum(CMout(i,:))-TP;
-    TN = sum(sum(CMout(:,:)))-(TP+FP+FN);
+CMindoor = confusionmat(trueLabelIndoor,predLabelIndoor);
+
+ssLR = NaN*ones(size(CMindoor,1),1);
+for i = 1:size(CMindoor,1)
+    TP = CMindoor(i,i);
+    FP = sum(CMindoor(:,i))-TP;
+    FN = sum(CMindoor(i,:))-TP;
+    TN = sum(sum(CMindoor(:,:)))-(TP+FP+FN);
     ssLR(i,1) = TP/(TP+FN);
     ssLR(i,2) = TN/(TN+FP);
 end

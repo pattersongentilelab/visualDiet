@@ -124,8 +124,18 @@ actlumusAll.wearLabel = categorical(actlumusAll.wear,-1:1:1,{'night','non-wear',
 
 actlumusAll.indoor = zeros(height(actlumusAll),1);
 actlumusAll.indoor(actlumusAll.LIGHT<442) = 1;
+actlumusAll.indoorBlue = zeros(height(actlumusAll),1);
+actlumusAll.indoorBlue(actlumusAll.MELANOPICEDI<412) = 1;
+actlumusAll.indoorOG = zeros(height(actlumusAll),1);
+actlumusAll.indoorOG(actlumusAll.LIGHT<1000) = 1;
+actlumusAll.indoorBlueOG = zeros(height(actlumusAll),1);
+actlumusAll.indoorBlueOG(actlumusAll.MELANOPICEDI<1000) = 1;
 actlumusAll.hiIR = zeros(height(actlumusAll),1);
 actlumusAll.hiIR(actlumusAll.IRphoto>0.0008) = 1;
+
+actlumusAll.indoorReal = NaN*ones(height(actlumusAll),1);
+actlumusAll.indoorReal(actlumusAll.environment==1) = 1;
+actlumusAll.indoorReal(actlumusAll.environment==3) = 0;
 
 actlumusAll.hang = zeros(height(actlumusAll),1);
 actlumusAll.up = zeros(height(actlumusAll),1);
