@@ -205,4 +205,26 @@ hold on
 errorbar(1,mean(M.vlsq8),std(M.vlsq8),'ok')
 ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0.9 1.1];
 
+%% Compare and graph circadian metrics
 
+[rSL, pSL] = corr([SPL.LightHr SPL.B10_500m SPL.LightShift SPL.TST SPL.WASO SPL.SlEff SPL.sleepMidpoint SPL.MVPAdur5to10]);
+
+TS = T(~isnan(T.SleepMidpoint) & ~isnan(T.LightShift),:);
+[rSL2, pSL2] = corr([TS.LightHr TS.mEDI_min500 TS.LightShift TS.TST TS.WASO TS.SlEff TS.SleepMidpoint TS.MVPAdur5to10]);
+
+
+figure
+plot_val = [TS.LightHr TS.LightShift TS.SleepMidpoint TS.MVPAdur5to10];
+R = corr(plot_val);
+ttl = {'Daylight >250 mEDI (hr)','Light shift (min)','Sleep midpoint (hr)','Physical activity'};
+pl = 1;
+for x = 1:4
+    for y = 1:4
+        subplot(4,4,pl)
+        hold on
+        plot(plot_val(:,x),plot_val(:,y),'.k','MarkerSize',8)
+        lsline
+        ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; xlabel(ttl(x)); ylabel(ttl(y)); title(num2str(R(x,y)))
+        pl = pl+1;
+    end
+end

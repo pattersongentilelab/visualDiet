@@ -11,6 +11,9 @@ load([data_path '/sleepPA_T'],'paT','sleepT')
 load([data_path '/weatherNov24toMarch25.mat'])
 load([data_path '/haQuestionnaireVD'],'haQ')
 load([data_path '/Actlumus/Actlumus validation/mdlBin1cpg2.mat'],'mdlLR')
+load('/Users/pattersonc/Library/CloudStorage/OneDrive-Children''sHospitalofPhiladelphia/Research/Pfizer Registry/Analysis/assocSxHA/CAMS_ChopAll_Aug2024.mat','CAMS')
+
+addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
 participants = fieldnames(headache_diary);
 
@@ -131,9 +134,9 @@ for i = 1:length(participants)
 
         Light(d,1) = sum(vd_cleaned.LIGHT(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.LIGHT)))./60; % calculate lux*hr
         mEDI(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDI)))./60; % calculate lux*hr
-        mEDI_M(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=6 & vd_cleaned.hour<8 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
-        mEDI_A(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=15 & vd_cleaned.hour<18 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60; 
-        mEDI_B(d,1) = sum(vd_cleaned.MELANOPICEDIlog(vd_cleaned.hour>=21 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDIlog)))./60;
+        mEDI_M(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.hour>=7 & vd_cleaned.hour<9 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDI)))./60; 
+        mEDI_A(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.hour>=15 & vd_cleaned.hour<18 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDI)))./60; 
+        mEDI_B(d,1) = sum(vd_cleaned.MELANOPICEDI(vd_cleaned.hour>=21 & vd_cleaned.day==Day(d) & ~isnan(vd_cleaned.MELANOPICEDI)))./60;
 
         if prctDay(:,d)>=0.8
             GoodDay(d,1) = 1;
@@ -463,6 +466,54 @@ T.Rainy = zeros(height(T),1);
 T.Rainy(T.Precip>0) = 1;
 T.Dark = zeros(height(T),1);
 T.Dark(T.Daylight<10.1) = 1;
+
+%% Calculate CAMS
+haASx = [M.nausea M.vomiting M.assoc_light M.assoc_sound M.assoc_smell M.assoc_lighthead...
+    M.assoc_spinning M.assoc_balance M.assoc_thinking M.vis_blurry M.vis_double M.assoc_ringing M.assoc_neckpain];
+
+M.aSx_count = sum(haASx,2);
+
+binary_hx = cell(size(haASx));
+binary_struct = NaN*ones(size(haASx,2),1);
+for x = 1:size(haASx,2)
+    temp = haASx(:,x);
+    outcome = unique(temp);
+        for y = 1:size(haASx,1)
+            binary_struct(x,:) = 2;
+                switch temp(y)
+                    case outcome(1)
+                        binary_hx{y,x} = [1 0];
+                    case outcome(2)
+                        binary_hx{y,x} = [0 1];
+                end
+        end
+end
+
+% concatonate each subjects binary outcomes
+binary_Hx = NaN*ones(size(binary_hx,1),size(CAMS.var_pres,1)*2);
+temp = [];
+for x = 1:size(binary_hx,1)
+    for y = 1:size(binary_hx,2)
+        temp = cat(2,temp,cell2mat(binary_hx(x,y)));
+    end
+    binary_Hx(x,:) = temp;
+    temp = [];
+end
+
+% Calculate MCA scores from original dataset
+MCA_no = 12;
+MCA_score_HAaSx = NaN*ones(size(binary_Hx,1),MCA_no);
+for x = 1:size(binary_Hx,1)
+    for y = 1:MCA_no
+        temp1 = binary_Hx(x,:);
+        temp2 = CAMS.MCA_model(:,y);
+        r = temp1*temp2;
+        MCA_score_HAaSx(x,y) = r;
+    end
+end
+
+M.MCA1_HAaSx = MCA_score_HAaSx(:,1);
+M.MCA2_HAaSx = -1*MCA_score_HAaSx(:,2);
 
 %% add sleep and physical activity data
 SPL = M(ismember(M.record_id,sleepM.ID),:);
