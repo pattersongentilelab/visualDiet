@@ -1,4 +1,4 @@
-% Actlumus data organization
+ % Actlumus data organization
 % Some light metrics based on Guidolin et al. "Protocol for a prospective, multicentre, 
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
@@ -10,7 +10,7 @@ load([data_path '/sleepPA_M.mat'])
 load([data_path '/sleepPA_T'],'paT','sleepT')
 load([data_path '/weatherNov24toMarch25.mat'])
 load([data_path '/haQuestionnaireVD'],'haQ')
-load([data_path '/Actlumus/Actlumus validation/mdlBin1cpg2.mat'],'mdlLR')
+load([data_path '/Actlumus/Actlumus validation/mdlRFupdated2.mat'],'Mdl')
 load('/Users/pattersonc/Library/CloudStorage/OneDrive-Children''sHospitalofPhiladelphia/Research/Pfizer Registry/Analysis/assocSxHA/CAMS_ChopAll_Aug2024.mat','CAMS')
 
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
@@ -55,7 +55,7 @@ for i = 1:length(participants)
     vd_cleaned = vd(ismember(vd.day,[hd.day;hd.day(end)+1]),:);
     
     % Apply wear/non-wear/night filter
-    [vd_cleaned,prctDay,prctNight] = wearMdl(vd_cleaned,hd,mdlLR);
+    [vd_cleaned,prctDay,prctNight,prctAll] = wearMdl(vd_cleaned,hd,Mdl);
 
     % vd_cleaned.LIGHT(vd_cleaned.wear=='non-wear') = NaN;
     % vd_cleaned.MELANOPICEDI(vd_cleaned.wear=='non-wear') = NaN;
@@ -124,6 +124,7 @@ for i = 1:length(participants)
     cont_mEDItime = NaT([7 2040],"Format","hh:mm:ss");
     GoodDay = zeros(length(Day),1);
     GoodNight = zeros(length(Day),1);
+    GoodAll = zeros(length(Day),1);
    
     for d = 1:length(Day)
 
@@ -144,6 +145,10 @@ for i = 1:length(participants)
 
         if prctNight(:,d)>=0.8
             GoodNight(d,1) = 1;
+        end
+
+        if prctAll(:,d)>=0.8
+            GoodAll(d,1) = 1;
         end
         % time period of certain light exposures
         Min250_B10(d,1) = length(vd_cleaned.MELANOPICEDI(vd_cleaned.MELANOPICEDI>250 & vd_cleaned.day==Day(d) & vd_cleaned.hour>=7 & vd_cleaned.hour<17))./(10*60);
@@ -177,8 +182,12 @@ for i = 1:length(participants)
     t.light_min1000 = Min1000_B10l;
     t.mEDI_max10 = Max10_E3;
     t.mEDI_max1 = Max1_D6;
+    t.PrctDay = prctDay(1:7)';
+    t.PrctNight = prctNight(1:7)';
+    t.PrctAll = prctAll(1:7)';
     t.GoodDay = GoodDay;
     t.GoodNight = GoodNight;
+    t.GoodAll = GoodAll;
     
     subject_data.summary{:,i} = t;
     subject_data.light_hr{:,i} = Light_hr;
@@ -226,10 +235,9 @@ for i = 1:length(participants)
     else
         T = [T;subject_data.summary{1,i}];
     end
-    pause
+    % pause
     clf
 end
-
 
 
 
@@ -281,137 +289,17 @@ T.glasses_hr(ismissing(T.glasses_hr)) = "0";
 T.glasses_hr(T.glasses_hr=="") = "0";
 T.glasses_hr = str2double(T.glasses_hr);
 
-%% Remove days with <80% night and day wear, and participants with < 3 days of usuable data
+%% Remove non-adherent days, and participants with < 3 days of usuable data
 
-T = T(T.GoodDay==1|T.GoodNight==1,:);
+% T = T(T.GoodAll==1,:);
 participants = unique(T.record_id);
 haQ = haQ(ismember(haQ.record_id,participants),:);
+sleepM = sleepM(ismember(sleepM.ID,participants),:);
+paM = paM(ismember(paM.ID,participants),:);
 
+M = summaryLightData(T,surveys,haQ);
 
-%% calculate summary data
-
-% pre-allocate
-HaPrct = NaN*ones(length(participants),1); DisabilityPrct = NaN*ones(length(participants),1);
-MigPrct = NaN*ones(length(participants),1); 
-pain_scoreM = NaN*ones(length(participants),1); light_scaleM = NaN*ones(length(participants),1); glasses_hrM = NaN*ones(length(participants),1);
-Light = NaN*ones(length(participants),1);
-mEDI = NaN*ones(length(participants),1);
-mEDI_M = NaN*ones(length(participants),1);
-mEDI_A = NaN*ones(length(participants),1);
-mEDI_B = NaN*ones(length(participants),1);
-B10_250m = NaN*ones(length(participants),1); B10_1000m = NaN*ones(length(participants),1);
-E3_10m = NaN*ones(length(participants),1); D6_1m = NaN*ones(length(participants),1);
-HAhrM = NaN*ones(length(participants),1);
-Month = NaN*ones(length(participants),1);
-
-
-for i = 1:length(participants)
-    HaPrct(i,1) = length(T.record_id(T.record_id==participants(i) & T.ha==1))./length(T.record_id(T.record_id==participants(i)));
-    MigPrct(i,1) = length(T.record_id(T.record_id==participants(i) & T.migraine==1))./length(T.record_id(T.record_id==participants(i)));
-    DisabilityPrct(i,1) = length(T.record_id(T.record_id==participants(i) & T.disability==1))./length(T.record_id(T.record_id==participants(i)));
-    boot2 = bootstrp(1000,@median,T.pain_score(T.record_id==participants(i)));
-    pain_scoreM(i,:) = prctile(boot2,50);
-    boot3 = bootstrp(1000,@median,T.light_scale(T.record_id==participants(i)));
-    light_scaleM(i,:) = prctile(boot3,50);
-    boot4 = bootstrp(1000,@median,T.glasses_hr(T.record_id==participants(i)));
-    glasses_hrM(i,:) = prctile(boot4,50);
-    Light(i,:) = nanmedian(T.Light(T.record_id==participants(i) & T.GoodDay==1));
-    mEDI(i,:) = nanmedian(T.mEDI(T.record_id==participants(i) & T.GoodDay==1));
-    mEDI_M(i,:) = nanmedian(T.mEDI_M(T.record_id==participants(i) & T.GoodDay==1));
-    mEDI_A(i,:) = nanmedian(T.mEDI_A(T.record_id==participants(i) & T.GoodDay==1));
-    mEDI_B(i,:) = nanmedian(T.mEDI_B(T.record_id==participants(i) & T.GoodNight==1));
-    B10_250m(i,:) = nanmedian(T.mEDI_min250(T.record_id==participants(i) & T.GoodDay==1));
-    B10_1000m(i,:) = nanmedian(T.light_min1000(T.record_id==participants(i) & T.GoodDay==1));
-    E3_10m(i,:) = nanmedian(T.mEDI_max10(T.record_id==participants(i) & T.GoodDay==1 & T.GoodNight==1));
-    D6_1m(i,:) = nanmedian(T.mEDI_max1(T.record_id==participants(i) & T.GoodNight==1));
-    HAhrM(i,:) = nanmedian(T.ha_hr(T.record_id==participants(i)));
-    Month(i,:) = mode(T.month(T.record_id==participants(i)));
-    B10mid(i,:) = nanmean(T.B10midpoint(T.record_id==participants(i)));
-    D6mid(i,:) = nanmean(T.D6midpoint(T.record_id==participants(i)));
-    B10midN(i,:) = nanmean(T.B10midpointNum(T.record_id==participants(i)));
-    D6midN(i,:) = nanmean(T.D6midpointNum(T.record_id==participants(i)));
-    WD_B10(i,:) = nanmean(T.B10midpointNum(T.record_id==participants(i) & T.weekend==0 & T.GoodDay==1));
-    WD_D6(i,:) = nanmean(T.D6midpointNum(T.record_id==participants(i) & T.weekend==0 & T.GoodNight==1));
-    WE_B10(i,:) = nanmean(T.B10midpointNum(T.record_id==participants(i) & T.weekend==1 & T.GoodDay==1));
-    WE_D6(i,:) = nanmean(T.D6midpointNum(T.record_id==participants(i) & T.weekend==1 & T.GoodNight==1));
-    clear boot*
-end
-
-M = table(participants,'VariableNames',{'record_id'});
-
-% Add additional info from survey data
-surveys = surveys(ismember(surveys.record_id,M.record_id),:);
-M.sex = surveys.patient_sex(surveys.redcap_event_name=='visit_1_arm_1');
-M.age = surveys.patient_age_today(surveys.redcap_event_name=='visit_1_arm_1');
-M.Month = categorical(Month);
-M.Ha = surveys.days_any_ha(surveys.redcap_event_name=='visit_2_arm_1');
-M.BadHa = surveys.days_bad_ha(surveys.redcap_event_name=='visit_2_arm_1');
-M.pedmidas_score = surveys.pedmidas_score(surveys.redcap_event_name=='visit_3_arm_1');
-vlsq8 = [surveys.lsa_4(surveys.redcap_event_name=='visit_2_arm_1') surveys.lsa_7(surveys.redcap_event_name=='visit_2_arm_1')...
-    surveys.sensitivity_score(surveys.redcap_event_name=='visit_2_arm_1') surveys.lsa_1(surveys.redcap_event_name=='visit_2_arm_1')...
-    surveys.lsa_9(surveys.redcap_event_name=='visit_2_arm_1') surveys.lsa_11(surveys.redcap_event_name=='visit_2_arm_1')...
-    surveys.lsa_14(surveys.redcap_event_name=='visit_2_arm_1') surveys.lsa_16(surveys.redcap_event_name=='visit_2_arm_1')];
-M.vlsq8 = sum(vlsq8,2);
-M.pain_fear = surveys.fear_score(surveys.redcap_event_name=='visit_2_arm_1');
-M.pain_avoid = surveys.avoid_score(surveys.redcap_event_name=='visit_2_arm_1');
-M.fopqc = surveys.fopqc_score(surveys.redcap_event_name=='visit_2_arm_1');
-M.CM = zeros(height(M),1);
-M.CM(M.Ha>=15 & M.BadHa>=8) = 1;
-M.pedmidas_grade = zeros(height(M),1);
-M.pedmidas_grade(M.pedmidas_score>=4 & M.pedmidas_score<10) = 1;
-M.pedmidas_grade(M.pedmidas_score>=10 & M.pedmidas_score<17) = 2;
-M.pedmidas_grade(M.pedmidas_score>=17) = 3;
-M.pedmidas_grade = categorical(M.pedmidas_grade,0:3,{'none','mild','moderate','severe'});
-M.sleepDis = surveys.sleep_dis_level(surveys.redcap_event_name=='visit_3_arm_1');
-M.sleepImp = surveys.sleep_imp_level(surveys.redcap_event_name=='visit_3_arm_1');
-M.DisBi = zeros(height(M),1);
-M.DisBi(M.pedmidas_grade=='moderate' | M.pedmidas_grade=='severe') = 1;
-M.FopBi = zeros(height(M),1);
-M.FopBi(M.fopqc>=30) = 1;
-M.SlIbi = zeros(height(M),1);
-M.SlIbi(M.sleepImp>=2) = 1;
-M.SlDbi = zeros(height(M),1);
-M.SlDbi(M.sleepDis>=2) = 1;
-M.VsBi = zeros(height(M),1);
-M.VsBi(M.vlsq8>24) = 1;
-M.AgeBi = zeros(height(M),1);
-M.AgeBi(M.age>=18) = 1;
-M.ha_sleep = haQ.ha_sleep;
-M.cont = haQ.p_current_ha_pattern;
-M.vis_spots = haQ.vision_aura_sx_baseline___spot;
-M.vis_stars = haQ.vision_aura_sx_baseline___star;
-M.vis_spots = haQ.vision_aura_sx_baseline___spot;
-M.vis_flash = haQ.vision_aura_sx_baseline___light;
-M.vis_zigzag = haQ.vision_aura_sx_baseline___zigzag;
-M.vis_blurry = haQ.vision_aura_sx_baseline___blur;
-M.vis_double = haQ.vision_aura_sx_baseline___double_vis;
-M.vis_heat = haQ.vision_aura_sx_baseline___heat;
-M.weak = haQ.assoc_sx_neuro_bil___weak;
-M.nausea = haQ.assoc_sx_gi___naus;
-M.vomiting = haQ.assoc_sx_gi___vomiting;
-M.assoc_light = haQ.associated_sx___light;
-M.assoc_sound = haQ.associated_sx___sound;
-M.assoc_smell = haQ.associated_sx___smell;
-M.assoc_lighthead = haQ.associated_sx___lighthead;
-M.assoc_spinning = haQ.associated_sx___spinning;
-M.assoc_balance = haQ.associated_sx___balance;
-M.assoc_hear = haQ.associated_sx___hear;
-M.assoc_ringing = haQ.associated_sx___ringing;
-M.assoc_neckpain = haQ.associated_sx___neck_pain;
-M.assoc_thinking = haQ.associated_sx___think;
-M.assoc_talking = haQ.associated_sx___talk;
-
-% add headache features
-M.HaPrct = HaPrct; M.MigPrct = MigPrct; M.DisabilityPrct = DisabilityPrct;
-M.pain_scoreM = pain_scoreM; M.light_scaleM = light_scaleM; M.glasses_hrM = glasses_hrM; 
-M.HAhrM = HAhrM;
-
-% add light measurements
-M.Light = Light; M.mEDI = mEDI; M.mEDI_M = mEDI_M; M.mEDI_A = mEDI_A; M.mEDI_B = mEDI_B; M.B10_1000m = B10_1000m; M.B10_250m = B10_250m;
-M.E3_10m = E3_10m; M.D6_1m = D6_1m; M.B10mid = B10mid; M.D6mid = D6mid; M.B10midN = B10midN; M.D6midN = D6midN; M.WD_B10 = WD_B10; M.WE_B10 = WE_B10; M.WD_D6 = WD_D6; M.WE_D6 = WE_D6; 
-clear lightM light_scaleM pain_scoreM *Lo *Hi *Prct boot* mEDImin* LightVar B10* D6* E3*
-
-% add factors to T
+%% add factors to T
 T.fopqc = NaN*ones(height(T),1);
 T.pedmidas = NaN*ones(height(T),1);
 T.age = NaN*ones(height(T),1);
@@ -560,4 +448,4 @@ SPL.SleepMidpointVar = SleepMidpointVar; SPL.TSTvar = TSTvar; SPL.SlEffVar = SlE
 
 %% save
 
-save([data_path '/pilotVDwearRemoveBad'],'M','T','SPL','subject_data')
+save([data_path '/pilotVDwearRemoveBadupdated'],'M','T','SPL','subject_data')

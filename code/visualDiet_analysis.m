@@ -3,12 +3,24 @@
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
 data_path = getpref('visualDiet','visualDietDataPath');
-load([data_path '/pilotVDwearRemoveBad'])
+load([data_path '/pilotVDwearRemoveBadupdated'])
 
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
+
+% calculate number of good days
 participants = unique(M.record_id);
 
+M.GoodDays = NaN*ones(height(M),1);
+for x = 1:length(participants)
+    M.GoodDays(x) = length(T.record_id(T.record_id==participants(x) & T.GoodDay==1));
+end
+
+% remove participants with poor quality data
+participants = unique(M.record_id(M.GoodDays>2));
+M = M(ismember(M.record_id,participants),:);
+T = T(ismember(T.record_id,participants),:);
+SPL = SPL(ismember(SPL.record_id,participants),:);
 
 %% Light Timing
 
@@ -101,7 +113,7 @@ figure
 hold on
 x_data = 1/60:1/60:(24-(30/60));
 % y_data = mEDI_hrAllm(M.CM==0,:);
-y_data = light_hrAll(T.GoodDay==1,:) - mEDI_hrAll(T.GoodDay==1,:);
+y_data = light_hrAll(T.migraine==0,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -113,7 +125,7 @@ TEMP = fill(x_ERR,y_ERR,[0.8 0.8 0.8],'EdgeColor','none');
 plot(x_data,y_dataM,'-','Color','k')
 
 % y_data = mEDI_hrAllm(M.CM==1,:);
-y_data = mEDI_hrAll(T.GoodDay==1,:);
+y_data = light_hrAll(T.migraine==1,:);
 bootval=bootstrp(1000,@nanmean,y_data);
 bootval=sort(bootval);
 y_dataM=bootval(500,:);
@@ -122,7 +134,7 @@ y_dataERR2=bootval(ub,:);
 x_ERR=cat(2,x_data,fliplr(x_data));
 y_ERR=cat(2,y_dataERR1,fliplr(y_dataERR2));
 TEMP = fill(x_ERR,y_ERR,[1 0.8 0.8],'EdgeColor','none');
-% plot(x_data,y_dataM,'-','Color','r')
+plot(x_data,y_dataM,'-','Color','r')
 
 ax=gca; ax.TickDir='out'; ax.Box='off'; ax.XLim = [0,24]; ax.YLim = log([0.01,1200]);
 ax.XTick = 0:6:23; ax.XTickLabels = {'12a','6a','12p','6p'};

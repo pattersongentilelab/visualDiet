@@ -2,23 +2,22 @@
 data_path = getpref('visualDiet','visualDietDataPath');
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
-load([data_path '/Actlumus/Actlumus validation/mdlBin1cpg2.mat'],'mdlLR','actlumusAll')
-
-bin_size = 0;
-model = 0; % 0 = logistic regression, 1 = SVM
+load([data_path '/Actlumus/Actlumus validation/mdlRFupdated2.mat'],'Mdl','actlumusAll')
 
 % select dataset
-validateData = actlumusAll(actlumusAll.testData==0 & ~isundefined(actlumusAll.wearLabel),:);
+testData = actlumusAll(actlumusAll.trainData==0 & ~isundefined(actlumusAll.wearLabel),:);
 
-switch model
-    case 0
-        Mdl = mdlLR;
-    case 1
-        Mdl = Mdlsvm;
+trueLabel = testData.wearLabel;
+[predLabel,scores] = predict(Mdl,testData);
+predLabel = categorical(predLabel);
+testers = unique(testData.tester);
+fullMdl_accuracyTest = zeros(length(testers), 1);
+testData.predLabel = predLabel;
+testData.trueLabel = trueLabel;
+for i = 1:length(testers)
+    fullMdl_accuracyTest(i) = mean(predLabel(testData.tester==testers(i)) ==trueLabel(testData.tester==testers(i)));
 end
-
-trueLabel = validateData.wearLabel;
-[predLabel,scores] = predict(Mdl,validateData);
+meanFullAccuracyTest = mean(fullMdl_accuracyTest);
 rocObj = rocmetrics(trueLabel,scores,Mdl.ClassNames);%,'NumBootstraps', 100);
 op = modelOperatingPoint(rocObj);
 thrshW = op.Threshold(3);
@@ -43,9 +42,9 @@ end
 
 SS = (CM(1,1) + CM(2,2) + CM(3,3))/sum(sum(CM(:,:)));
 
-testers = unique(validateData.tester);
+testers = unique(testData.tester);
 
-save([data_path '/Actlumus/Actlumus validation/mdlValidateBin1cpg2.mat'],'rocObj','ss','SS')
+save([data_path '/Actlumus/Actlumus validation/mdlValidateBin1updated.mat'],'rocObj','ss','SS')
 %% run model on participants with migraine
 load([data_path 'VDS.mat'])
 
@@ -55,6 +54,7 @@ actlumus = struct2cell(actlumus);
 
 prctDay = NaN*ones(length(participants),7);
 prctNight = NaN*ones(length(participants),7);
+NightPlace = NaN*ones(length(participants),7);
 
 for i = 1:length(participants)
     vd = actlumus{i};
@@ -84,42 +84,17 @@ for i = 1:length(participants)
     vd.participant = categorical(cellstr(repmat(participants{i},[height(vd),1])));
     vd.outdoor = zeros(height(vd),1);
     vd.outdoor(vd.LIGHT>1000) = 1;
-    vd.hiIR = zeros(height(vd),1);
-    vd.hiIR(vd.IRphoto>0.0008) = 1;
     
     vd.hang = zeros(height(vd),1);
     vd.up = zeros(height(vd),1);
     vd.down = zeros(height(vd),1);
     vd.move = zeros(height(vd),1);
     vd.dark = zeros(height(vd),1);
-
-    for x = floor((bin_size/2))+1:height(vd)-floor((bin_size/2))
-        epoch = vd(x-floor((bin_size/2)):x+floor((bin_size/2)),:);
-    
-        if mode(epoch.ORIENTATION)<32
-            vd.up(x) = 1;
-        end
-    
-        if mode(epoch.ORIENTATION)==32
-            vd.down(x) = 1;
-        end
-    
-        if ~isempty(epoch.ORIENTATION(epoch.ORIENTATION==2))
-            vd.hang(x) = 1;
-        end
-    
-        if median(epoch.LIGHT)<=1
-            vd.dark(x) = 1;
-        end
-    
-        if mean(epoch.TAT)>0
-            vd.move(x) = 1;
-        end
-    
-    end
+    vd.lightlog = log(vd.LIGHT+0.1);
+    vd.pimlog = log(vd.PIM+1);
     
     [predLabel,scores] = predict(Mdl,vd);
-    vd.predLabel = predLabel;
+    vd.predLabel = categorical(predLabel);
     
     vd.LIGHTlog = vd.LIGHT;
     vd.LIGHTlog(vd.LIGHTlog<0.01) = 0.01;
@@ -143,45 +118,18 @@ for i = 1:length(participants)
         ax.YLim = [log(0.009) log(120000)]; ax.YTick = log([0.1 1 10 100 1000 10000 100000]); ax.YTickLabels = {'0','1','10','100','1k','10k','100k'};
         
         if X<7
-            N = length(vd.TIME(vd.day==Day(X+1) & vd.hour<6 & vd.predLabel=='night'));
+            N = length(vd.TIME(vd.day==Day(X+1) & vd.hour<6 & vd.predLabel~='non-wear'));
             NwN = length(vd.TIME(vd.day==Day(X+1) & vd.hour<6 & vd.predLabel=='non-wear'));
         end
-        D = length(vd.TIME(vd.day==Day(X) & vd.hour>10 & vd.hour<22 & vd.predLabel=='wear'));
-        NwD = length(vd.TIME(vd.day==Day(X) & vd.hour>10 & vd.hour<22 & vd.predLabel=='non-wear'));
-        prctNight(i,X) = N/(NwN+N);
-        prctDay(i,X) = D/(NwD+D);
-    end
+            NwD = length(vd.TIME(vd.day==Day(X) & vd.hour>6 & vd.predLabel=='non-wear'));
+            D = length(vd.TIME(vd.day==Day(X) & vd.hour>6 & vd.predLabel~='non-wear'));
 
-        if prctNight(i,X)>=0.8
-            vd.GoodNight = ones(height(vd),1);
-        else
-            vd.GoodNight = zeros(height(vd),1);
-        end
-        
-        if prctDay(i,X)>=0.8
-            vd.GoodDay = ones(height(vd),1);
-        else
-            vd.GoodDay = zeros(height(vd),1);
-        end
+        prctAdhere(i,X) = length(vd.TIME(vd.day==Day(X) & vd.predLabel~='non-wear'))./length(vd.TIME(vd.day==Day(X)));
+    end
 
     if i==1
         actlumus_mig = vd;
     else
         actlumus_mig = [actlumus_mig;vd];
     end
-end
-
-figure
-subplot(1,2,1)
-histogram(actlumus_mig.GoodDay,'Normalization','probability')
-
-subplot(1,2,2)
-histogram(actlumus_mig.GoodNight,'Normalization','probability')
-
-day_min = vd.total_min(vd.day==min(vd.day));
-for i = 1:length(day_min)
-    goodDay(i,:) = nanmean(actlumus_mig.LIGHTlog(actlumus_mig.GoodDay==1 & actlumus_mig.total_min==day_min(i)));
-    goodNight(i,:) = nanmean(actlumus_mig.LIGHTlog(actlumus_mig.GoodNight==1 & actlumus_mig.total_min==day_min(i)));
-    badDay(i,:) = nanmean(actlumus_mig.LIGHTlog(actlumus_mig.GoodDay==0 & actlumus_mig.total_min==day_min(i)));
-    badNight(i,:) = nanmean(actlumus_mig.LIGHTlog(actlumus_mig.GoodNight==0 & actlumus_mig.total_min==day_min(i)));
 end

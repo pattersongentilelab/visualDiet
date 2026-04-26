@@ -115,6 +115,8 @@ T.LightHr_nextDay(7:7:end) = NaN;
 
 T.migraine_nextDay = circshift(T.migraine,-1);
 T.migraine_nextDay(7:7:end) = NaN;
+T.migraine_next1stDay = T.migraine_nextDay;
+T.migraine_next1stDay(T.migraine==1) = NaN;
 T.ha_nextDay = circshift(T.ha,-1);
 T.ha_nextDay(7:7:end) = NaN;
 
@@ -180,13 +182,16 @@ T.pca2_sleep = score(:,2);
 T.SleepMidpointMin = T.SleepMidpoint.*60;
 T.TSTmin = T.TST.*60;
 
-% calculate sleep midpoint on weekends only
+% calculate sleep midpoint on weekdays and weekends only
 pSPL = unique(SPL.record_id);
 for x = 1:length(pSPL)
     SleepMidpointWknd(x,1) = nanmean(T.SleepMidpoint(T.record_id==pSPL(x) & T.weekend_night==1));
+    SleepMidpointWkday(x,1) = nanmean(T.SleepMidpoint(T.record_id==pSPL(x) & T.weekend_night==0));
 end
 
 SPL.SleepMidpointWknd = SleepMidpointWknd;
+SPL.SleepMidpointWkday = SleepMidpointWkday;
+
 
 % plot sleep midpoint
 
@@ -207,7 +212,7 @@ ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0.9 1.1];
 
 %% Compare and graph circadian metrics
 
-[rSL, pSL] = corr([SPL.LightHr SPL.B10_500m SPL.LightShift SPL.TST SPL.WASO SPL.SlEff SPL.sleepMidpoint SPL.MVPAdur5to10]);
+[rSL, pSL] = corr([SPL.mEDI SPL.LightShift SPL.LightShiftVar SPL.sleepMidpoint SPL.SleepMidpointVar SPL.MVPAdur5to10]);
 
 TS = T(~isnan(T.SleepMidpoint) & ~isnan(T.LightShift),:);
 [rSL2, pSL2] = corr([TS.LightHr TS.mEDI_min500 TS.LightShift TS.TST TS.WASO TS.SlEff TS.SleepMidpoint TS.MVPAdur5to10]);
@@ -228,3 +233,23 @@ for x = 1:4
         pl = pl+1;
     end
 end
+
+%% migraine prediction
+mdl_migPred = fitglme(T,'migraine_next1stDay ~ LightHr + (1|record_id)','Distribution', 'Binomial', 'Link', 'logit');
+
+
+[rSLmig, pSLmig] = corr([SPL.MigPrct SPL.mEDI SPL.LightShift SPL.LightShiftVar SPL.sleepMidpoint SPL.SleepMidpointVar SPL.MVPAdur5to10],'Type','Spearman');
+
+[rSLha, pSLha] = corr([SPL.Ha SPL.mEDI SPL.LightShift SPL.LightShiftVar SPL.sleepMidpoint SPL.SleepMidpointVar SPL.MVPAdur5to10],'Type','Spearman');
+
+[rLha, pLha] = corr([M.BadHa M.mEDI M.LightShift M.LightShiftVar],'Type','Spearman');
+
+
+%% plot individual participant data
+
+pp = Tcleaned(Tcleaned.record_id==1,:);
+Lt = subject_data.light_by_day{1,:};
+
+figure
+subplot(1,3,1)
+bt = bootstrp(1000,@mean,pp.LightShift);

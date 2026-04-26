@@ -7,24 +7,30 @@ LightDiary = {};
 for X = 1:4
     switch X
         case 1
-            load([data_path '/Actlumus/Actlumus validation/actlumusValidationCPG.mat'])
+            load([data_path '/Actlumus/Actlumus validation/actlumusValidationCPGupdated.mat'])
         case 2
-            load([data_path '/Actlumus/Actlumus validation/actlumusValidationBMP.mat'])
+            load([data_path '/Actlumus/Actlumus validation/actlumusValidationBMPupdated.mat'])
         case 3
-            load([data_path '/Actlumus/Actlumus validation/actlumusValidationNRR.mat'])
+            load([data_path '/Actlumus/Actlumus validation/actlumusValidationNRRupdated.mat'])
         case 4
-            load([data_path '/Actlumus/Actlumus validation/actlumusValidationCLS.mat'])
+            load([data_path '/Actlumus/Actlumus validation/actlumusValidationCLSupdated.mat'])
     end
 
-    actlumus.IRphoto = actlumus.IR./actlumus.LIGHT;
+    actlumus.IRphoto = actlumus.IRLIGHT./actlumus.LIGHT;
     actlumus.tester = X*ones(height(actlumus),1);
     lightDiary.start_time = duration(string(lightDiary.start_time),'InputFormat','hh:mm');
     lightDiary.end_time = duration(string(lightDiary.end_time),'InputFormat','hh:mm');
     
     actlumus.MS = duration(string(actlumus.MS));
-    
+   
     % select actlumus data within the time window of light diary recordings
     actlumus = actlumus(actlumus.DATETIME<=max(lightDiary.date) & actlumus.DATETIME>=min(lightDiary.date),:);
+
+    % find entries where the light logger was covered by a shirt the whole
+    % time and convert to non-wear since it should be counted as
+    % non-adherence
+    lightDiary.activity_type(lightDiary.wear_obstruct=="yes") = 'nonwear';
+    lightDiary.activity_type(lightDiary.wear_obstruct=="some") = '<undefined>';
 
     % convert light diary variables to numbers
     lightDiary.wear = zeros(height(lightDiary),1); % nonwear = 0
@@ -74,13 +80,14 @@ for X = 1:4
             actlumus.environment(actlumus.DATETIME==D & actlumus.MS>=sT & actlumus.MS<eT) = E;
             actlumus.shirt(actlumus.DATETIME==D & actlumus.MS>=sT & actlumus.MS<eT) = Sh;
             actlumus.beddown(actlumus.DATETIME==D & actlumus.MS>=sT & actlumus.MS<eT) = Bd;
-        else
-            nD = lightDiary.date(i+1);
-            actlumus.wear((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = W;
-            actlumus.activity((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = A;
-            actlumus.environment((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = E;
-            actlumus.shirt((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = Sh;
-            actlumus.beddown((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = Bd;
+        else if sT>eT && i<height(lightDiary)
+                nD = lightDiary.date(i+1);
+                actlumus.wear((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = W;
+                actlumus.activity((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = A;
+                actlumus.environment((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = E;
+                actlumus.shirt((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = Sh;
+                actlumus.beddown((actlumus.DATETIME==D & actlumus.MS>=sT)|(actlumus.DATETIME==nD & actlumus.MS<eT)) = Bd;
+            end
         end
     
     end
@@ -93,6 +100,14 @@ for X = 1:4
        actlumus.shirt(actlumus.DATETIME=='2025-08-12' & actlumus.MS>'13:47:00' & actlumus.MS<'13:53:00') = 1;
    end
 
+   % identify train and test data
+    all_dates = unique(actlumus.DATETIME(~isnan(actlumus.wear)));
+    TST = randperm(length(all_dates));
+    testDates = all_dates(TST(1:7));
+
+    actlumus.trainData = zeros(height(actlumus),1);
+    actlumus.trainData(ismember(actlumus.DATETIME,testDates)) = 1;
+
     Actlumus(X) = {actlumus};
     LightDiary(X,:) = {lightDiary};
 
@@ -104,14 +119,6 @@ for X = 1:4
 
 end
 
-
-%% identify test and validation data
-
-cpg_dates = unique(actlumusAll.DATETIME(actlumusAll.tester==1));
-cpg_testDates = cpg_dates([2:5 7:8]);
-
-actlumusAll.testData = zeros(height(actlumusAll),1);
-actlumusAll.testData(ismember(actlumusAll.DATETIME,cpg_testDates) & actlumusAll.tester==1) = 1;
 
 %% build outcomes
 [h,m,s] = hms(actlumusAll.MS);
@@ -138,10 +145,15 @@ actlumusAll.indoorReal(actlumusAll.environment==1) = 1;
 actlumusAll.indoorReal(actlumusAll.environment==3) = 0;
 
 actlumusAll.hang = zeros(height(actlumusAll),1);
+actlumusAll.hang(actlumusAll.ORIENTATION==2) = 1;
 actlumusAll.up = zeros(height(actlumusAll),1);
+actlumusAll.up(actlumusAll.ORIENTATION==16) = 1;
 actlumusAll.down = zeros(height(actlumusAll),1);
+actlumusAll.down(actlumusAll.ORIENTATION==32) = 1;
 actlumusAll.move = zeros(height(actlumusAll),1);
+actlumusAll.move(actlumusAll.PIM>0) = 1;
 actlumusAll.dark = zeros(height(actlumusAll),1);
+actlumusAll.dark(actlumusAll.LIGHT<=1) = 1;
 
 actlumusAll.wearBi = zeros(height(actlumusAll),1);
 actlumusAll.wearBi(actlumusAll.wearLabel=='wear') = 1;
@@ -151,32 +163,19 @@ actlumusAll.nightBi = zeros(height(actlumusAll),1);
 actlumusAll.nightBi(actlumusAll.wearLabel=='night') = 1;
 actlumusAll.nightBiLabel = categorical(actlumusAll.nightBi,[0,1],{'non-night','night'});
 
-% make lower temporal resolution version of actlumus data to determine wear
-% vs. non-wear
-bin_size = 0; % define binsize for cut-points
-for x = floor((bin_size/2))+1:height(actlumusAll)-floor((bin_size/2))
-    epoch = actlumusAll(x-floor((bin_size/2)):x+floor((bin_size/2)),:);
+actlumusAll.lightlog = log(actlumusAll.LIGHT+0.1);
+actlumusAll.pimlog = log(actlumusAll.PIM+1);
+actlumusAll.TATlog = log(actlumusAll.TAT+0.5);
 
-    if mode(epoch.ORIENTATION)<32
-        actlumusAll.up(x) = 1;
-    end
+actlumusAll = actlumusAll(~isnan(actlumusAll.wear),:);
 
-    if mode(epoch.ORIENTATION)==32
-        actlumusAll.down(x) = 1;
-    end
+% PCA
+pca_var = [actlumusAll.lightlog actlumusAll.daytime actlumusAll.pimlog actlumusAll.down actlumusAll.hang];
+[coeff,score,latent,tsquared,explained,mu] = pca(pca_var);
 
-    if ~isempty(epoch.ORIENTATION(epoch.ORIENTATION==2))
-        actlumusAll.hang(x) = 1;
-    end
+actlumusAll.pca1 = score(:,1);
+actlumusAll.pca2 = score(:,2);
+actlumusAll.pca3 = score(:,3);
 
-    if median(epoch.LIGHT)<=1
-        actlumusAll.dark(x) = 1;
-    end
-
-    if mean(epoch.TAT)>0
-        actlumusAll.move(x) = 1;
-    end
-
-end
-
-save([data_path '/Actlumus/Actlumus validation/actlumusValidationAllbin1.mat'],'actlumusAll','Actlumus','LightDiary')
+save([data_path '/Actlumus/Actlumus validation/actlumusValidationAllbin1updated.mat'],'actlumusAll','Actlumus','LightDiary')
+save([data_path '/Actlumus/Actlumus validation/actlumusValidationPCA.mat'],'actlumusAll','coeff','score','latent','tsquared','explained','mu')
