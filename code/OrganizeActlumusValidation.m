@@ -165,7 +165,6 @@ actlumusAll.nightBiLabel = categorical(actlumusAll.nightBi,[0,1],{'non-night','n
 
 actlumusAll.lightlog = log(actlumusAll.LIGHT+0.1);
 actlumusAll.pimlog = log(actlumusAll.PIM+1);
-actlumusAll.TATlog = log(actlumusAll.TAT+0.5);
 
 actlumusAll = actlumusAll(~isnan(actlumusAll.wear),:);
 

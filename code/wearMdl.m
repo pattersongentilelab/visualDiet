@@ -20,7 +20,6 @@ q.parse(varargin{:});
     vd.dark(vd.LIGHT<=1) = 1;
     vd.lightlog = log(vd.LIGHT+0.1);
     vd.pimlog = log(vd.PIM+1);
-    vd.TATlog = log(vd.PIM+0.5);
 
     [predLabel,~] = predict(mdl,vd);
     vd.predLabel = categorical(predLabel);

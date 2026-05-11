@@ -3,7 +3,7 @@
 % cross-sectional cohort study to assess personal light exposure." medRxiv (2024): 2024-02.
 
 data_path = getpref('visualDiet','visualDietDataPath');
-load([data_path '/pilotVDgrant'])
+load([data_path '/pilotVDwearRemoveBadupdated'])
 
 addpath '/Users/pattersonc/Documents/MATLAB/commonFx'
 
@@ -119,6 +119,12 @@ T.migraine_next1stDay = T.migraine_nextDay;
 T.migraine_next1stDay(T.migraine==1) = NaN;
 T.ha_nextDay = circshift(T.ha,-1);
 T.ha_nextDay(7:7:end) = NaN;
+T.disability_nextDay = circshift(T.disability,-1);
+T.disability_nextDay(7:7:end) = NaN;
+T.pain_nextDay = circshift(T.pain_score,-1);
+T.pain_nextDay(7:7:end) = NaN;
+T.lightsens_nextDay = circshift(T.light_scale,-1);
+T.lightsens_nextDay(7:7:end) = NaN;
 
 T.weekend_night = zeros(height(T.migraine),1);
 T.weekend_night(T.daynum==7|T.daynum==6) = 1;
@@ -133,10 +139,10 @@ SPL.LightShiftVar = M.LightShiftVar(ismember(M.record_id,SPL.record_id));
 
 %% Look at correlation between variables
 
-[rLight, pLight] = corr([M.Ha M.vlsq8 M.fopqc M.pedmidas_score M.B10_500m M.mEDI M.B10_250m],'Type','Spearman');
+[rLight, pLight] = corr([M.Ha M.vlsq8 M.fopqc M.pedmidas_score M.B10_1000m M.mEDI M.B10_250m],'Type','Spearman');
 
 Tcleaned = T(~isnan(T.MVPAdur5to10),:);
-[rAll, pAll] = corr([Tcleaned.mEDI_min500 Tcleaned.mEDI Tcleaned.mEDI_min250 Tcleaned.MVPAdur5to10 Tcleaned.TST Tcleaned.WASO Tcleaned.SlEff]);
+[rAll, pAll] = corr([Tcleaned.light_min1000 Tcleaned.mEDI Tcleaned.mEDI_min250 Tcleaned.MVPAdur5to10 Tcleaned.TST Tcleaned.WASO Tcleaned.SlEff]);
 
 [rSl, pSl] = corr([SPL.sleepDis SPL.sleepImp SPL.B10_250m SPL.TST SPL.WASO SPL.SlEff SPL.sleepMidpoint SPL.MVPAdur5to10 SPL.vlsq8 SPL.fopqc],'Type','Spearman');
 
@@ -146,7 +152,10 @@ Tcleaned = T(~isnan(T.MVPAdur5to10),:);
 
 fMdl = fitglm(T,'LightHr_nextDay ~ light_scale');
 
-mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id)');
+mdl_lightsleep = fitglme(T,'migraine ~ SleepMidpoint + LightShift + (1|record_id)','Distribution','binomial');
+
+TT = T(~isnan(T.migraine_next1stDay) & T.GoodDay==1,:);
+mdl_light = fitglme(TT,'migraine_next1stDay ~ LightHr + (1|record_id)','Distribution','binomial');
 
 figure
 subplot(2,2,1)
@@ -215,7 +224,7 @@ ax = gca; ax.TickDir = 'out'; ax.Box = 'off'; ax.XLim = [0.9 1.1];
 [rSL, pSL] = corr([SPL.mEDI SPL.LightShift SPL.LightShiftVar SPL.sleepMidpoint SPL.SleepMidpointVar SPL.MVPAdur5to10]);
 
 TS = T(~isnan(T.SleepMidpoint) & ~isnan(T.LightShift),:);
-[rSL2, pSL2] = corr([TS.LightHr TS.mEDI_min500 TS.LightShift TS.TST TS.WASO TS.SlEff TS.SleepMidpoint TS.MVPAdur5to10]);
+[rSL2, pSL2] = corr([TS.LightHr TS.light_min1000 TS.LightShift TS.TST TS.WASO TS.SlEff TS.SleepMidpoint TS.MVPAdur5to10]);
 
 
 figure
